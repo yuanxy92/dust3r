@@ -251,8 +251,27 @@ def draw_scene_ez(scene,pose,pts3d,color="rgba(0,255,0,0.5)"):
         plot_camera(fig,R,t,K,color="rgba(255,0,0,0.5)",text=f'cam_{ind}')
     fig.show()
 
+def save_dust3r_poses_and_depth(scene, filename, pose_refine = None,pts3d = None):
+    # get images, focal length
+    imgs = scene.imgs
+    focals = scene.get_focals()
+    focals = focals.squeeze().detach().cpu().numpy()
+    if pose_refine is None:
+        poses = scene.get_im_poses()
+        poses = poses.detach().cpu().numpy()
+    else:
+        poses = np.asarray(pose_refine)
+    if pts3d is None:
+        pts3d = scene.get_pts3d()
+        pts3d = [pts.detach().cpu().numpy() for pts in pts3d]
+    confidence_masks = scene.get_masks()
 
-
+    with open(filename, 'wb') as f:
+        np.save(f, imgs)
+        np.save(f, focals)
+        np.save(f, poses)
+        np.save(f, pts3d)
+        np.save(f, confidence_masks)
 
 def draw_dust3r_scene(scene,pose_refine = None,pts3d = None):
     imgs = scene.imgs

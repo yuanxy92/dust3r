@@ -21,12 +21,14 @@ import viz_3d
 
 device = 'cuda'
 batch_size = 1
-schedule = 'linear'
+schedule = 'cosine'
 lr = 0.01
 niter = 300
 
 # load images
-name_list = [os.path.join('./data/9001gate',i) for i in os.listdir('./data/9001gate')]          
+dirname = './data/9001gate'
+npyname = './data/9001gate.npy'
+name_list = [os.path.join(dirname,i) for i in os.listdir(dirname)]          
 images = load_images(name_list, size=512, square_ok=True)
 
 model_name = "checkpoints/DUSt3R_ViTLarge_BaseDecoder_512_dpt.pth"
@@ -46,5 +48,8 @@ loss = scene.compute_global_alignment(init="mst", niter=niter, schedule=schedule
 focals = scene.get_focals()
 avg_focal = sum(focals)/len(focals)
 
-viz_3d.draw_dust3r_scene(scene)
+# save results
+viz_3d.save_dust3r_poses_and_depth(scene, npyname)
+
+# viz_3d.draw_dust3r_scene(scene)
 # viz_3d.draw_dust3r_match_ez(scene)
