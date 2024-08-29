@@ -40,7 +40,7 @@ output = inference(pairs, model, device, batch_size=batch_size)
 view1, pred1 = output['view1'], output['pred1']
 view2, pred2 = output['view2'], output['pred2']
 
-scene = global_aligner(output, device=device, min_conf_thr=1, mode=GlobalAlignerMode.PointCloudOptimizer)
+scene = global_aligner(output, device=device, min_conf_thr=1.5, mode=GlobalAlignerMode.PointCloudOptimizer)
 scene.preset_focal([246.8 / 400.0 * 512.0]*len(name_list))
 loss = scene.compute_global_alignment(init="mst", niter=niter, schedule=schedule, lr=lr)
 focals = scene.get_focals()

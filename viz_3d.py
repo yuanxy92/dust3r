@@ -294,7 +294,7 @@ def draw_dust3r_scene(scene,pose_refine = None,pts3d = None):
 
     #plot reconstruction
     fig = init_figure()
-    n_viz = min(40000,len(all_rgbs))
+    n_viz = min(80000,len(all_rgbs))
     idx_to_viz = list(np.round(np.linspace(0, len(all_rgbs)-1, n_viz)).astype(int))
     vis_rgbs = [all_rgbs[idx] for idx in idx_to_viz]
     plot_points(fig,all_pts3d[idx_to_viz],vis_rgbs,ps=2,name='3dpts')
