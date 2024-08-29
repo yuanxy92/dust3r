@@ -264,7 +264,10 @@ def save_dust3r_poses_and_depth(scene, filename, pose_refine = None,pts3d = None
     if pts3d is None:
         pts3d = scene.get_pts3d()
         pts3d = [pts.detach().cpu().numpy() for pts in pts3d]
+    
     confidence_masks = scene.get_masks()
+    for i in range(len(imgs)):
+        confidence_masks[i] = confidence_masks[i].cpu().numpy()
 
     with open(filename, 'wb') as f:
         np.save(f, imgs)
