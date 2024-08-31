@@ -11,8 +11,8 @@ import time
 import numpy as np
 import cv2
 
-from features import matching
-from bundle_adj import _hom_to_from, traverse
+from .features import matching
+from .bundle_adj import _hom_to_from, traverse
 
 MAX_RESOLUTION = 1400
 
@@ -54,7 +54,7 @@ def equalize_gains(regions):
             if np.any(pts[:, 2] < 0):   # behind the screen, skip
                 continue
             overlap = cv2.warpPerspective(regions[j].img, hom, (width, height),
-                                          borderMode=cv2.BORDER_TRANSPARENT)
+                                        borderMode=cv2.BORDER_TRANSPARENT)
             mask = overlap[..., 3] != 0
             sizes[i, j] = sizes[j, i] = np.sum(mask)
             if sizes[i, j] == 0:  # no overlap
@@ -84,7 +84,7 @@ class SphProj:
     def proj2hom(pts):
         """Recover projective points from spherical coordinates."""
         return np.stack([np.sin(pts[:, 0]), np.tan(pts[:, 1]),
-                         np.cos(pts[:, 0])], axis=-1)
+                        np.cos(pts[:, 0])], axis=-1)
 
 
 class CylProj:
@@ -256,7 +256,10 @@ def _hat(size):
 
 def _add_weights(img):
     """Add weights scaled as (x-0.5)*(y-0.5) in normalized coordinates."""
-    img = cv2.cvtColor(img.astype(np.float32) / 255, cv2.COLOR_RGB2RGBA)
+    if img.dtype == np.uint8:
+        img = cv2.cvtColor(img.astype(np.float32) / 255, cv2.COLOR_RGB2BGRA)
+    elif img.dtype == np.float32:
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGRA)
     height, width = img.shape[:2]
     img[..., 3] = _hat(height)[:, None] * _hat(width)[None, :]
 
@@ -373,7 +376,7 @@ def idx_to_keypoints(matches, kpts):
     """Replace keypoint indices with their coordinates."""
     def _i_to_k(match, kpt1, kpt2):
         return np.concatenate([kpt1[match[:, 0]], kpt2[match[:, 1]]],
-                              axis=1)
+            axis=1)
 
     # homogeneous coordinates
     kpts = [np.concatenate([kp, np.ones((kp.shape[0], 1))], axis=1)
@@ -382,7 +385,7 @@ def idx_to_keypoints(matches, kpts):
     matches = matches.item()   # unpack dictionary
     # add match confidence (number of inliers)
     matches = {i: {j: (_i_to_k(m, kpts[i], kpts[j]), h, len(m))
-                   for j, (m, h) in col.items()} for i, col in matches.items()}
+        for j, (m, h) in col.items()} for i, col in matches.items()}
 
     return matches
 

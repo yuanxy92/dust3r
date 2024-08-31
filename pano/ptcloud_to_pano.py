@@ -10,6 +10,8 @@ import cv2
 
 from pano.features import matching
 from pano.bundle_adj import _hom_to_from, traverse, Image, rotation_to_mat, intrinsics
+from pano.stitcher import no_blend, _proj_img_range_border, _add_weights, estimate_resolution
+from pano.stitcher import SphProj, no_blend, linear_blend, multiband_blend
 
 def project_point_cloud_to_pano(point_cloud, pano_image, intrinsic_matrix):
     """
@@ -48,13 +50,65 @@ def project_point_cloud_to_pano(point_cloud, pano_image, intrinsic_matrix):
     return output_image
 
 def convert_dust3r_to_pano(imgs, focals, poses, pts3d, confidence_masks):
+    # init images
     regs = []
     for idx in range(len(imgs)):
         rotation_mat = poses[idx][:3, :3]
-        reg = Image(imgs[idx], rotation_mat,
-            intrinsics(focals[idx], (imgs[idx].shape[1] / 2, imgs[idx].shape[0] / 2)))
+        reg = Image(imgs[idx], rotation_mat.transpose(),
+            intrinsics(focals[idx], (0, 0)))
+        # reg = Image(imgs[idx], rotation_mat,
+            # intrinsics(focals[idx], (imgs[idx].shape[1] / 2, imgs[idx].shape[0] / 2)))
         regs.append(reg)
     return regs
+
+def pano_stitch(ba_images, blender=no_blend, equalize=False, crop=False):
+    # compute range
+    for ba_image in ba_images:
+        ba_image.range = _proj_img_range_border(ba_image.img.shape[:2], ba_image.hom())
+        ba_image.img = _add_weights(ba_image.img)
+    # estimate resolution
+    resolution, im_range = estimate_resolution(ba_images)
+    target = (im_range[1] - im_range[0]) / resolution
+
+    shape = tuple(int(t) for t in np.round(target))[::-1]  # y,x order
+    patches = []
+
+    for reg in ba_images:
+        bottom = np.round((reg.range[0] - im_range[0])/resolution)
+        top = np.round((reg.range[1] - im_range[0])/resolution)
+        bottom, top = bottom.astype(np.int32), top.astype(np.int32)
+        hh_, ww_ = reg.img.shape[:2]  # original image shape
+
+        # pad image if multi-band to avoid sharp edges where the image ends
+        if blender == multiband_blend:
+            bottom = np.maximum(bottom - 10, np.int32([0, 0]))
+            top = np.minimum(top + 10, target.astype(np.int32))
+
+        # find pixel coordinates
+        y_i, x_i = np.indices((top[1]-bottom[1], top[0]-bottom[0]))
+        x_i = (x_i + bottom[0]) * resolution[0] + im_range[0][0]
+        y_i = (y_i + bottom[1]) * resolution[1] + im_range[0][1]
+        xx_ = SphProj.proj2hom(np.stack([x_i, y_i], axis=-1).reshape(-1, 2))
+
+        # transform to the original image coordinates
+        xx_ = reg.proj().dot(xx_.T).T.astype(np.float32)
+        xx_ = xx_.reshape(top[1]-bottom[1], top[0]-bottom[0], -1)
+        mask = xx_[..., -1] < 0  # behind the screen
+
+        x_pr = xx_[..., :-1] / xx_[..., [-1]] + np.float32([ww_/2, hh_/2])
+        mask |= (x_pr[..., 0] < 0) | (x_pr[..., 0] > ww_-1) | \
+                (x_pr[..., 1] < 0) | (x_pr[..., 1] > hh_-1)
+
+        # paste only valid pixels
+        warped = cv2.remap(reg.img, x_pr[:, :, 0], x_pr[:, :, 1],
+                        cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
+        warped[..., 3] = warped[..., 3] * (~mask)
+        irange = np.s_[bottom[1]:top[1], bottom[0]:top[0]]
+        patches.append((warped, mask, irange))
+
+    mosaic = blender(patches, shape)
+    cv2.imwrite('./data/pano_9001gate.jpg', mosaic)
+    return mosaic
 
 def main():
     # load data
@@ -64,9 +118,11 @@ def main():
         poses = np.load(f)
         pts3d = np.load(f)
         confidence_masks = np.load(f)
-    
-    regions = convert_dust3r_to_pano(imgs, focals, poses, pts3d, confidence_masks)
-    a = 1
+    # generate bundle adjust image
+    ba_imgs = convert_dust3r_to_pano(imgs, focals, poses, pts3d, confidence_masks)
+    result = pano_stitch(ba_imgs, blender=multiband_blend, equalize=False, crop=False)
+
+    return result
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
