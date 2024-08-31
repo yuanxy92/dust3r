@@ -191,7 +191,8 @@ def plot_descs(descs, side=25):
 
 def sift_detector():
     """Closure, return a SIFT detecting function."""
-    sift = cv2.xfeatures2d.SIFT_create()
+    # sift = cv2.xfeatures2d.SIFT_create()
+    sift = cv2.SIFT_create()
 
     def _detect(img):
         kp_, des = sift.detectAndCompute(img, None)
