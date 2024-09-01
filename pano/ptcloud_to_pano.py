@@ -23,7 +23,7 @@ class PanoImage:
     trans: np.ndarray # t of the extrinsic matrix
     intr: np.ndarray
     pts3d: np.ndarray
-    confidence_masks: np.ndarray
+    confidence_mask: np.ndarray
     distimg: np.ndarray
     panocenter: np.ndarray = None
     range: tuple = (np.zeros(2), np.zeros(2))
@@ -60,7 +60,7 @@ def convert_dust3r_to_pano(imgs, focals, poses, pts3d, confidence_masks):
         rotation_mat = poses[idx][:3, :3]
         trans_mat = poses[idx][:3, 3]
         pano_image = PanoImage(img=imgs[idx], rot=rotation_mat.transpose(), trans=trans_mat,
-            intr=intrinsics(focals[idx], (0, 0)), pts3d=pts3d[idx], confidence_masks=confidence_masks[idx], distimg=None)
+            intr=intrinsics(focals[idx], (0, 0)), pts3d=pts3d[idx], confidence_mask=confidence_masks[idx], distimg=None)
         pano_images.append(pano_image)
     # compute center of all the cameras
     camera_array_center = compute_center_of_camera_arrays(pano_images)
@@ -70,7 +70,7 @@ def convert_dust3r_to_pano(imgs, focals, poses, pts3d, confidence_masks):
         pano_images[idx].dist()
     return pano_images
 
-def _add_weights_dist(img):
+def _add_weights_single_channel(img):
     """Add weights scaled as (x-0.5)*(y-0.5) in normalized coordinates."""
     img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGRA)
     height, width = img.shape[:2]
@@ -82,7 +82,8 @@ def pano_stitch(ba_images, blender=no_blend, equalize=False, crop=False):
     for ba_image in ba_images:
         ba_image.range = _proj_img_range_border(ba_image.img.shape[:2], ba_image.hom())
         ba_image.img = _add_weights(ba_image.img)
-        ba_image.distimg = _add_weights_dist(ba_image.dist())
+        ba_image.distimg = _add_weights_single_channel(ba_image.dist())
+        ba_image.confidence_mask = _add_weights_single_channel(ba_image.confidence_mask)
     # estimate resolution
     resolution, im_range = estimate_resolution(ba_images)
     target = (im_range[1] - im_range[0]) / resolution
@@ -90,6 +91,7 @@ def pano_stitch(ba_images, blender=no_blend, equalize=False, crop=False):
     shape = tuple(int(t) for t in np.round(target))[::-1]  # y,x order
     patches = []
     patches_dist = []
+    patches_conf = []
 
     for reg in ba_images:
         bottom = np.round((reg.range[0] - im_range[0])/resolution)
@@ -128,16 +130,30 @@ def pano_stitch(ba_images, blender=no_blend, equalize=False, crop=False):
                         cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
         warped_dist[..., 3] = warped_dist[..., 3] * (~mask)
 
+        # warped dist image
+        warped_conf = cv2.remap(reg.confidence_mask, x_pr[:, :, 0], x_pr[:, :, 1],
+                        cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
+        warped_conf[..., 3] = warped_conf[..., 3] * (~mask)
+
         patches.append((warped, mask, irange))
         patches_dist.append((warped_dist, mask, irange))
+        patches_conf.append((warped_conf, mask, irange))
 
     mosaic_rgb = blender(patches, shape)
     mosaic_dist = blender(patches_dist, shape)
-    cv2.imwrite('./data/pano_9001gate.jpg', mosaic_rgb)
+    mosaic_conf = blender(patches_conf, shape)
+    with open('./data/pano_9001gate.npy', 'wb') as f:
+        np.save(f, mosaic_rgb)
+        np.save(f, mosaic_dist)
+        np.save(f, mosaic_conf)
 
+    cv2.imwrite('./data/pano_9001gate.png', mosaic_rgb)
     mosaic_dist_norm = mosaic_dist / np.max(mosaic_dist) * 255
-    cv2.imwrite('./data/pano_9001gate_dist.jpg', mosaic_dist_norm.astype(np.uint8))
-    return mosaic_rgb, mosaic_dist
+    cv2.imwrite('./data/pano_9001gate_dist.png', mosaic_dist_norm.astype(np.uint8))
+    mosaic_conf_norm = mosaic_conf / np.max(mosaic_conf) * 255
+    cv2.imwrite('./data/pano_9001gate_conf.png', mosaic_conf_norm.astype(np.uint8))
+
+    return mosaic_rgb, mosaic_dist, mosaic_conf
 
 def main():
     # load data
