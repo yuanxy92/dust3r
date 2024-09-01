@@ -3,6 +3,7 @@ import logging
 import os
 import pickle
 import time
+from dataclasses import dataclass
 
 import open3d as o3d
 import numpy as np
@@ -12,6 +13,30 @@ from pano.features import matching
 from pano.bundle_adj import _hom_to_from, traverse, Image, rotation_to_mat, intrinsics
 from pano.stitcher import no_blend, _proj_img_range_border, _add_weights, estimate_resolution
 from pano.stitcher import SphProj, no_blend, linear_blend, multiband_blend
+
+@dataclass
+class PanoImage:
+    """Patch with all the informations for stitching."""
+    img: np.ndarray
+    rot: np.ndarray
+    intr: np.ndarray
+    pts3d: np.ndarray
+    confidence_masks: np.ndarray
+    depthimg: np.ndarray
+    range: tuple = (np.zeros(2), np.zeros(2))
+
+    def hom(self):
+        """Homography from pixel to normalized coordinates."""
+        return self.rot.T.dot(np.linalg.inv(self.intr))
+    
+    def depth(self):
+        if self.depthimg is None:
+            a = 1
+        return self.depthimg
+
+    def proj(self):
+        """Return camera projection transform."""
+        return self.intr.dot(self.rot)
 
 def project_point_cloud_to_pano(point_cloud, pano_image, intrinsic_matrix):
     """
@@ -54,12 +79,14 @@ def convert_dust3r_to_pano(imgs, focals, poses, pts3d, confidence_masks):
     regs = []
     for idx in range(len(imgs)):
         rotation_mat = poses[idx][:3, :3]
-        reg = Image(imgs[idx], rotation_mat.transpose(),
-            intrinsics(focals[idx], (0, 0)))
+        reg = PanoImage(img=imgs[idx], rot=rotation_mat.transpose(),
+            intr=intrinsics(focals[idx], (0, 0)), pts3d=pts3d, confidence_masks=confidence_masks, depthimg=None)
         # reg = Image(imgs[idx], rotation_mat,
             # intrinsics(focals[idx], (imgs[idx].shape[1] / 2, imgs[idx].shape[0] / 2)))
         regs.append(reg)
     return regs
+
+
 
 def pano_stitch(ba_images, blender=no_blend, equalize=False, crop=False):
     # compute range
@@ -108,6 +135,7 @@ def pano_stitch(ba_images, blender=no_blend, equalize=False, crop=False):
 
     mosaic = blender(patches, shape)
     cv2.imwrite('./data/pano_9001gate.jpg', mosaic)
+    
     return mosaic
 
 def main():
