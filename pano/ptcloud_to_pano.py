@@ -53,7 +53,6 @@ def compute_center_of_camera_arrays(pano_images):
     camera_center = camera_center / len(pano_images)
     return camera_center
 
-
 def convert_dust3r_to_pano(imgs, focals, poses, pts3d, confidence_masks):
     # init images
     pano_images = []
