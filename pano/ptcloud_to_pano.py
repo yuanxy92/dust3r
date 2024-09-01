@@ -18,25 +18,40 @@ from pano.stitcher import SphProj, no_blend, linear_blend, multiband_blend
 class PanoImage:
     """Patch with all the informations for stitching."""
     img: np.ndarray
-    rot: np.ndarray
+    # extrinsic matrix [R|t]
+    rot: np.ndarray # R^-1 of the extrinsic matrix
+    trans: np.ndarray # t of the extrinsic matrix
     intr: np.ndarray
     pts3d: np.ndarray
     confidence_masks: np.ndarray
-    depthimg: np.ndarray
+    distimg: np.ndarray
+    panocenter: np.ndarray = None
     range: tuple = (np.zeros(2), np.zeros(2))
 
     def hom(self):
         """Homography from pixel to normalized coordinates."""
         return self.rot.T.dot(np.linalg.inv(self.intr))
     
-    def depth(self):
-        if self.depthimg is None:
-            a = 1
-        return self.depthimg
+    def dist(self):
+        if self.distimg is None:
+            dist_mat = self.pts3d - self.panocenter
+            self.distimg = np.sum(np.square(dist_mat), axis=2)
+        return self.distimg
 
     def proj(self):
         """Return camera projection transform."""
         return self.intr.dot(self.rot)
+    
+    def cam_center(self):
+        camera_center = - self.rot @ self.trans
+        return camera_center
+    
+def compute_center_of_camera_arrays(pano_images):
+    camera_center = 0
+    for pano_image in pano_images:
+        camera_center = camera_center + pano_image.cam_center()
+    camera_center = camera_center / len(pano_images)
+    return camera_center
 
 def project_point_cloud_to_pano(point_cloud, pano_image, intrinsic_matrix):
     """
@@ -76,15 +91,20 @@ def project_point_cloud_to_pano(point_cloud, pano_image, intrinsic_matrix):
 
 def convert_dust3r_to_pano(imgs, focals, poses, pts3d, confidence_masks):
     # init images
-    regs = []
+    pano_images = []
     for idx in range(len(imgs)):
         rotation_mat = poses[idx][:3, :3]
-        reg = PanoImage(img=imgs[idx], rot=rotation_mat.transpose(),
-            intr=intrinsics(focals[idx], (0, 0)), pts3d=pts3d, confidence_masks=confidence_masks, depthimg=None)
-        # reg = Image(imgs[idx], rotation_mat,
-            # intrinsics(focals[idx], (imgs[idx].shape[1] / 2, imgs[idx].shape[0] / 2)))
-        regs.append(reg)
-    return regs
+        trans_mat = poses[idx][:3, 3]
+        pano_image = PanoImage(img=imgs[idx], rot=rotation_mat.transpose(), trans=trans_mat,
+            intr=intrinsics(focals[idx], (0, 0)), pts3d=pts3d[idx], confidence_masks=confidence_masks[idx], distimg=None)
+        pano_images.append(pano_image)
+    # compute center of all the cameras
+    camera_array_center = compute_center_of_camera_arrays(pano_images)
+    # compute distance to the center of the camera arrays
+    for idx in range(len(pano_images)):
+        pano_images[idx].panocenter = camera_array_center
+        pano_images[idx].dist()
+    return pano_images
 
 
 
