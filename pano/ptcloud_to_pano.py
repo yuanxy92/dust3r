@@ -158,8 +158,6 @@ if __name__ == '__main__':
     logging.getLogger('numba').setLevel(logging.WARNING)  # silence Numba
     main()
 
-
-
 def project_point_cloud_to_pano(point_cloud, pano_image, intrinsic_matrix):
     """
     Projects a point cloud onto a panoramic image.
