@@ -49,7 +49,20 @@ def rgbdpano_to_point_cloud(rgb_image, depth_image, conf_image, im_range, resolu
     point_cloud.colors = o3d.utility.Vector3dVector(colors_selected)
     return point_cloud
 
-def rgbdpano_to_ptmesh(rgb_image, depth_image, conf_image, im_range, resolution):
+def compute_normal_view_direction_angle(v0, v1, v2, panocenter):
+    face_center = (v0 + v1 + v2) / 3
+    # Compute the view direction from the face center to the camera position
+    view_direction = panocenter - face_center
+    view_direction /= np.linalg.norm(view_direction)
+    # Compute the normal for this triangle
+    normal = np.cross(v1 - v0, v2 - v0)
+    normal /= np.linalg.norm(normal)
+    # Compute the angle between the normal and the view direction
+    angle = np.arccos(np.dot(normal, view_direction))
+    angle_deg = np.degrees(angle)
+    return angle_deg
+
+def rgbdpano_to_ptmesh(rgb_image, depth_image, conf_image, im_range, resolution, panocenter, angle_th=80):
     """
     Convert RGB and Depth images into a point cloud
     :param rgb_image: HxWx3 numpy array representing the RGB image
@@ -86,9 +99,18 @@ def rgbdpano_to_ptmesh(rgb_image, depth_image, conf_image, im_range, resolution)
             idx_down = idx + width
             idx_down_right = idx + width + 1
             if mask[v, u] > 0 and mask[v + 1, u] > 0 and mask[v, u + 1] > 0:
-                triangles.append([idx, idx_down, idx_right])
+                # Compute the face center
+                angle_deg = compute_normal_view_direction_angle(vertices[idx], 
+                    vertices[idx_right], vertices[idx_down], panocenter)
+                if angle_deg < angle_th:
+                    triangles.append([idx, idx_down, idx_right])
             if mask[v, u + 1] > 0 and mask[v + 1, u] > 0 and mask[v + 1, u + 1] > 0:
-                triangles.append([idx_right, idx_down, idx_down_right])
+                # Compute the face center
+                angle_deg = compute_normal_view_direction_angle(vertices[idx_right], 
+                    vertices[idx_down], vertices[idx_right], panocenter)
+                if angle_deg < angle_th:
+                    triangles.append([idx_right, idx_down, idx_down_right])
+
     triangles = np.array(triangles)
     # Create the mesh object
     mesh = o3d.geometry.TriangleMesh()
@@ -169,7 +191,8 @@ def pano_stitch(ba_images, outdir, outname, blender=no_blend, equalize=False, cr
     # segment sky
     # convert RGB-Depth image to point clouds
     ptcloud = rgbdpano_to_point_cloud(mosaic_rgb, mosaic_dist[:, :, 0], mosaic_conf[:, :, 0], im_range, resolution)
-    mesh = rgbdpano_to_ptmesh(mosaic_rgb, mosaic_dist[:, :, 0], mosaic_conf[:, :, 0], im_range, resolution)
+    mesh = rgbdpano_to_ptmesh(mosaic_rgb, mosaic_dist[:, :, 0], mosaic_conf[:, :, 0], 
+        im_range, resolution, ba_images[0].panocenter)
 
     # save npy
     with open(f'{outdir}/{outname}.npy', 'wb') as f:
