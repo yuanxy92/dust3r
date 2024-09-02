@@ -237,8 +237,9 @@ def multiband_blend(patches, shape, n_levels=5):
         wsum[wsum == 0] = 1
         mosaic += layer / wsum[..., None]
 
-    mosaic = np.clip(mosaic, 0.0, 1.0)   # avoid saturation artifacts
-    return (255 * mosaic).astype(np.uint8)
+    return mosaic
+    # mosaic = np.clip(mosaic, 0.0, 1.0)   # avoid saturation artifacts
+    # return (255 * mosaic).astype(np.uint8)
 
 
 BLENDERS = {
