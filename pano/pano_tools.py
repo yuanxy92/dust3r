@@ -83,11 +83,11 @@ def convert_dust3r_to_pano(imgs, focals, poses, pts3d, confidence_masks):
     rot_to_I = pano_images[identity_idx].rot
     trans_to_I = -pano_images[identity_idx].rot @ pano_images[identity_idx].trans
     # extra rotation
-    theta_ = np.radians(90)  # Convert angle to radians
+    theta_ = np.radians(-75)  # Convert angle to radians
     c, s = np.cos(theta_), np.sin(theta_)
-    R_extra = np.array([[c, -s, 0],
-                [s, c, 0],
-                [0, 0, 1]])
+    R_extra = np.array([[c, 0, s],
+                [0, 1, 0],
+                [-s, 0, c]])
     transform_mat = np.identity(4, dtype=np.float32)
     transform_mat[:3, :3] = R_extra @ rot_to_I
     transform_mat[:3, 3] = trans_to_I
