@@ -18,6 +18,7 @@ from PIL import Image
 from pathlib import Path
 import copy
 import viz_3d
+import shutil
 
 device = 'cuda'
 batch_size = 1
@@ -25,31 +26,69 @@ schedule = 'cosine'
 lr = 0.01
 niter = 300
 
-# load images
-dirname = './data/9001gate'
-npyname = './data/9001gate.npy'
-name_list = [os.path.join(dirname,i) for i in os.listdir(dirname)]          
-images = load_images(name_list, size=512, square_ok=True)
+if __name__ == '__main__':
+    # dataset dir
+    datadir = '/Users/yuanxy/Downloads/LocalSend/data_0829_8_undis256_sr'
+    outdir = ''
+    os.makedirs(outdir, exist_ok=True)
+    # dust3r dir name
+    outdir_dust3r = os.path.join(outdir, 'dust3r_npy')
+    os.makedirs(outdir_dust3r, exist_ok=True)
 
-model_name = "checkpoints/DUSt3R_ViTLarge_BaseDecoder_512_dpt.pth"
-# you can put the path to a local checkpoint in model_name if needed
-model = AsymmetricCroCo3DStereo.from_pretrained(model_name).to(device)
+    # iterative over all the images
+    cam_indices = ['0', '1', '2', '4', '5', '6']
+    for frame_idx in range(200, 901, 100):
+        # check if all the images exists
+        isexist = True
+        name_list = []
+        for cam_idx in cam_indices:
+            filename = os.path.join(datadir, f'camera_{cam_idx}_frame_{frame_idx}_corrected.png')
+            isexist = isexist and os.path.isfile(filename)
+            name_list.append(filename)
+        if isexist == False:
+            continue
+        # apply dust3r
+        dust3r_outname = os.path.join(outdir_dust3r, f'frame_{frame_idx}.npy')
+        images = load_images(name_list, size=512, square_ok=True)
+        model_name = "checkpoints/DUSt3R_ViTLarge_BaseDecoder_512_dpt.pth"
+        # dust3r inference
+        model = AsymmetricCroCo3DStereo.from_pretrained(model_name).to(device)
+        pairs = make_pairs(images, scene_graph='complete', prefilter=None, symmetrize=True)
+        output = inference(pairs, model, device, batch_size=batch_size)
+        # align dust3r point clouds
+        scene = global_aligner(output, device=device, min_conf_thr=1.5, mode=GlobalAlignerMode.PointCloudOptimizer)
+        scene.preset_focal([246.8 / 400.0 * 512.0]*len(name_list))
+        loss = scene.compute_global_alignment(init="mst", niter=niter, schedule=schedule, lr=lr)
+        focals = scene.get_focals()
+        avg_focal = sum(focals)/len(focals)
+        # save results
+        viz_3d.save_dust3r_poses_and_depth(scene, dust3r_outname)
 
-pairs = make_pairs(images, scene_graph='complete', prefilter=None, symmetrize=True)
-output = inference(pairs, model, device, batch_size=batch_size)
+    # # load images
+    # dirname = './data/9001gate'
+    # npyname = './data/9001gate.npy'
+    # name_list = [os.path.join(dirname,i) for i in os.listdir(dirname)]          
+    # images = load_images(name_list, size=512, square_ok=True)
 
-# at this stage, you have the raw dust3r predictions
-view1, pred1 = output['view1'], output['pred1']
-view2, pred2 = output['view2'], output['pred2']
+    # model_name = "checkpoints/DUSt3R_ViTLarge_BaseDecoder_512_dpt.pth"
+    # # you can put the path to a local checkpoint in model_name if needed
+    # model = AsymmetricCroCo3DStereo.from_pretrained(model_name).to(device)
 
-scene = global_aligner(output, device=device, min_conf_thr=1.5, mode=GlobalAlignerMode.PointCloudOptimizer)
-scene.preset_focal([246.8 / 400.0 * 512.0]*len(name_list))
-loss = scene.compute_global_alignment(init="mst", niter=niter, schedule=schedule, lr=lr)
-focals = scene.get_focals()
-avg_focal = sum(focals)/len(focals)
+    # pairs = make_pairs(images, scene_graph='complete', prefilter=None, symmetrize=True)
+    # output = inference(pairs, model, device, batch_size=batch_size)
 
-# save results
-viz_3d.save_dust3r_poses_and_depth(scene, npyname)
+    # # at this stage, you have the raw dust3r predictions
+    # view1, pred1 = output['view1'], output['pred1']
+    # view2, pred2 = output['view2'], output['pred2']
 
-# viz_3d.draw_dust3r_scene(scene)
-# viz_3d.draw_dust3r_match_ez(scene)
+    # scene = global_aligner(output, device=device, min_conf_thr=1.5, mode=GlobalAlignerMode.PointCloudOptimizer)
+    # scene.preset_focal([246.8 / 400.0 * 512.0]*len(name_list))
+    # loss = scene.compute_global_alignment(init="mst", niter=niter, schedule=schedule, lr=lr)
+    # focals = scene.get_focals()
+    # avg_focal = sum(focals)/len(focals)
+
+    # # save results
+    # viz_3d.save_dust3r_poses_and_depth(scene, npyname)
+
+    # viz_3d.draw_dust3r_scene(scene)
+    # viz_3d.draw_dust3r_match_ez(scene)
