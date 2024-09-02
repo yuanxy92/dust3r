@@ -62,7 +62,7 @@ def compute_normal_view_direction_angle(v0, v1, v2, panocenter):
     angle_deg = np.degrees(angle)
     return angle_deg
 
-def rgbdpano_to_ptmesh(rgb_image, depth_image, conf_image, im_range, resolution, panocenter, angle_th=80):
+def rgbdpano_to_ptmesh(rgb_image, depth_image, conf_image, im_range, resolution, panocenter, angle_th=80, conf_th=0.3):
     """
     Convert RGB and Depth images into a point cloud
     :param rgb_image: HxWx3 numpy array representing the RGB image
@@ -82,9 +82,8 @@ def rgbdpano_to_ptmesh(rgb_image, depth_image, conf_image, im_range, resolution,
     y = depth_image * np.sin(phi) * np.sin(theta)
     z = depth_image * np.cos(phi)
     # Generate mask using threshold
-    th = 0.5
     mask = np.ones((conf_image.shape[0], conf_image.shape[1]))
-    mask[conf_image < th] = 0
+    mask[conf_image < conf_th] = 0
     triangles = []
     # Generate vertices
     vertices = np.stack((x.flatten(), y.flatten(), z.flatten()), axis=1)
