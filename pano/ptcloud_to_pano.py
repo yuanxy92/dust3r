@@ -9,9 +9,9 @@ import open3d as o3d
 import numpy as np
 import cv2
 
-from pano.stitcher import no_blend, _proj_img_range_border, _add_weights, estimate_resolution
-from pano.stitcher import SphProj, no_blend, linear_blend, multiband_blend, no_blend
-from pano_tools import PanoImage, _add_weights_single_channel, convert_dust3r_to_pano
+from .pano.stitcher import no_blend, _proj_img_range_border, _add_weights, estimate_resolution
+from .pano.stitcher import SphProj, no_blend, linear_blend, multiband_blend, no_blend
+from .pano_tools import PanoImage, _add_weights_single_channel, convert_dust3r_to_pano
 
 def rgbdpano_to_point_cloud(rgb_image, depth_image, conf_image, im_range, resolution):
     """
@@ -99,7 +99,7 @@ def rgbdpano_to_ptmesh(rgb_image, depth_image, conf_image, im_range, resolution)
     mesh.compute_vertex_normals()
     return mesh
 
-def pano_stitch(ba_images, blender=no_blend, equalize=False, crop=False):
+def pano_stitch(ba_images, outdir, outname, blender=no_blend, equalize=False, crop=False):
     # compute range
     for ba_image in ba_images:
         ba_image.range = _proj_img_range_border(ba_image.img.shape[:2], ba_image.hom())
@@ -172,20 +172,20 @@ def pano_stitch(ba_images, blender=no_blend, equalize=False, crop=False):
     mesh = rgbdpano_to_ptmesh(mosaic_rgb, mosaic_dist[:, :, 0], mosaic_conf[:, :, 0], im_range, resolution)
 
     # save npy
-    with open('./data/pano_9001gate.npy', 'wb') as f:
+    with open(f'{outdir}/{outname}.npy', 'wb') as f:
         np.save(f, mosaic_rgb)
         np.save(f, mosaic_dist)
         np.save(f, mosaic_conf)
     # save image
-    cv2.imwrite('./data/pano_9001gate.png', mosaic_rgb)
+    cv2.imwrite(f'{outdir}/{outname}.png', mosaic_rgb)
     mosaic_dist_norm = mosaic_dist / np.max(mosaic_dist) * 255
-    cv2.imwrite('./data/pano_9001gate_dist.png', mosaic_dist_norm.astype(np.uint8))
+    cv2.imwrite(f'{outdir}/{outname}_dist.png', mosaic_dist_norm.astype(np.uint8))
     mosaic_conf_norm = mosaic_conf / np.max(mosaic_conf) * 255
-    cv2.imwrite('./data/pano_9001gate_conf.png', mosaic_conf_norm.astype(np.uint8))
+    cv2.imwrite(f'{outdir}/{outname}_conf.png', mosaic_conf_norm.astype(np.uint8))
     # save point cloud
-    o3d.io.write_point_cloud("./data/pano_9001gate.ply", ptcloud)
+    o3d.io.write_point_cloud(f'{outdir}/{outname}.ply', ptcloud)
     # save mesh
-    o3d.io.write_triangle_mesh("./data/pano_9001gate_mesh.ply", mesh)
+    o3d.io.write_triangle_mesh(f'{outdir}/{outname}_mesh.ply', mesh)
 
     return mosaic_rgb, mosaic_dist, mosaic_conf, resolution, im_range
 
@@ -199,7 +199,7 @@ def main():
         confidence_masks = np.load(f)
     # generate bundle adjust image
     ba_imgs = convert_dust3r_to_pano(imgs, focals, poses, pts3d, confidence_masks)
-    result = pano_stitch(ba_imgs, blender=multiband_blend, equalize=False, crop=False)
+    result = pano_stitch(ba_imgs, './data', 'pano_9001gate', blender=multiband_blend, equalize=False, crop=False)
 
     return result
 

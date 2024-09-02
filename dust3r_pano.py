@@ -4,6 +4,8 @@ from dust3r.utils.image import load_images
 from dust3r.image_pairs import make_pairs
 from dust3r.cloud_opt import global_aligner, GlobalAlignerMode
 from dust3r.viz import show_raw_pointcloud,cat_3d
+from pano.pano.stitcher import SphProj, no_blend, linear_blend, multiband_blend, no_blend
+from pano.ptcloud_to_pano import convert_dust3r_to_pano, pano_stitch
 
 from matplotlib import pyplot as pl
 import os
@@ -28,16 +30,20 @@ niter = 300
 
 if __name__ == '__main__':
     # dataset dir
-    datadir = '/Users/yuanxy/Downloads/LocalSend/data_0829_8_undis256_sr'
-    outdir = ''
+    rootdir = 'C:/Projects/Code/Aurora_papers/data/arm_6cam'
+    datadir = os.path.join(rootdir, 'data_0829_8_undis256_sr')
+    outdir = os.path.join(rootdir, 'data_0829_8_recon')
     os.makedirs(outdir, exist_ok=True)
     # dust3r dir name
     outdir_dust3r = os.path.join(outdir, 'dust3r_npy')
     os.makedirs(outdir_dust3r, exist_ok=True)
+    # pano dir name
+    outdir_pano = os.path.join(outdir, 'pano')
+    os.makedirs(outdir_pano, exist_ok=True)
 
     # iterative over all the images
     cam_indices = ['0', '1', '2', '4', '5', '6']
-    for frame_idx in range(200, 901, 100):
+    for frame_idx in range(200, 901, 10):
         # check if all the images exists
         isexist = True
         name_list = []
@@ -47,8 +53,10 @@ if __name__ == '__main__':
             name_list.append(filename)
         if isexist == False:
             continue
+
         # apply dust3r
-        dust3r_outname = os.path.join(outdir_dust3r, f'frame_{frame_idx}.npy')
+        framename = f'frame_{frame_idx}'
+        dust3r_outname = os.path.join(outdir_dust3r, f'{framename}.npy')
         images = load_images(name_list, size=512, square_ok=True)
         model_name = "checkpoints/DUSt3R_ViTLarge_BaseDecoder_512_dpt.pth"
         # dust3r inference
@@ -63,6 +71,19 @@ if __name__ == '__main__':
         avg_focal = sum(focals)/len(focals)
         # save results
         viz_3d.save_dust3r_poses_and_depth(scene, dust3r_outname)
+
+        # apply pano stitching
+        os.makedirs(outdir, exist_ok=True)
+        with open(dust3r_outname, 'rb') as f:
+            imgs = np.load(f)
+            focals = np.load(f)
+            poses = np.load(f)
+            pts3d = np.load(f)
+            confidence_masks = np.load(f)
+        # generate bundle adjust image
+        ba_imgs = convert_dust3r_to_pano(imgs, focals, poses, pts3d, confidence_masks)
+        result = pano_stitch(ba_imgs, outdir=outdir_pano, outname=framename,
+            blender=multiband_blend, equalize=False, crop=False)
 
     # # load images
     # dirname = './data/9001gate'
