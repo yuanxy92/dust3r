@@ -43,7 +43,7 @@ if __name__ == '__main__':
 
     # iterative over all the images
     cam_indices = ['0', '1', '2', '4', '5', '6']
-    for frame_idx in range(200, 901, 10):
+    for frame_idx in range(200, 901, 50):
         # check if all the images exists
         isexist = True
         name_list = []
