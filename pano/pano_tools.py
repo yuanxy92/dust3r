@@ -19,7 +19,7 @@ class PanoImage:
     """Patch with all the informations for stitching."""
     img: np.ndarray
     # extrinsic matrix [R|t]
-    rot: np.ndarray # R^-1 of the extrinsic matrix
+    rot: np.ndarray # R^-1 or R^T of the extrinsic matrix
     trans: np.ndarray # t of the extrinsic matrix
     intr: np.ndarray
     pts3d: np.ndarray
@@ -69,12 +69,30 @@ def convert_dust3r_to_pano(imgs, focals, poses, pts3d, confidence_masks):
         pano_image = PanoImage(img=imgs[idx], rot=rotation_mat.transpose(), trans=trans_mat,
             intr=intrinsics(focals[idx], (0, 0)), pts3d=pts3d[idx], confidence_mask=confidence_masks[idx], distimg=None)
         pano_images.append(pano_image)
+    
     # compute center of all the cameras
     camera_array_center = compute_center_of_camera_arrays(pano_images)
+    
     # compute distance to the center of the camera arrays
     for idx in range(len(pano_images)):
         pano_images[idx].panocenter = camera_array_center
         pano_images[idx].dist()
+
+    # rotate and translate all the cameras
+    identity_idx = 0
+    rot_to_I = pano_images[identity_idx].rot
+    trans_to_I = -pano_images[identity_idx].rot @ pano_images[identity_idx].trans
+    transform_mat = np.identity(4, dtype=np.float32)
+    transform_mat[:3, :3] = rot_to_I
+    transform_mat[:3, 3] = trans_to_I
+    for idx in range(len(pano_images)):
+        extr_mat = np.identity(4, dtype=np.float32)
+        extr_mat[:3, :3] = pano_images[idx].rot.transponse()
+        extr_mat[:3, 3] = pano_images[idx].trans
+        extr_mat_new = transform_mat @ extr_mat
+        pano_images[idx].rot = extr_mat_new[:3, :3].transpose()
+        pano_images[idx].trans = extr_mat_new[:3, 3]
+
     return pano_images
     
 def pano_segment_sky(image):
