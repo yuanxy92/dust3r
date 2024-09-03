@@ -62,7 +62,7 @@ def compute_normal_view_direction_angle(v0, v1, v2, panocenter):
     angle_deg = np.degrees(angle)
     return angle_deg
 
-def rgbdpano_to_ptmesh(rgb_image, depth_image, conf_image, im_range, resolution, panocenter, angle_th=80, conf_th=0.3):
+def rgbdpano_to_ptmesh(rgb_image, depth_image, conf_image, im_range, resolution, panocenter, angle_th=85, conf_th=0.1):
     """
     Convert RGB and Depth images into a point cloud
     :param rgb_image: HxWx3 numpy array representing the RGB image
