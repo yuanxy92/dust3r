@@ -21,6 +21,7 @@ from pathlib import Path
 import copy
 import viz_3d
 import shutil
+import argparse
 
 device = 'cuda'
 batch_size = 1
@@ -28,11 +29,25 @@ schedule = 'cosine'
 lr = 0.01
 niter = 300
 
+def get_args_parser():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-r", "--root", type=str, help="data root dir", default='/data/xiaoyun/OV6946_Arm_6_cameras/20240829_256px_v2')
+    parser.add_argument("-d", "--dataname", type=str, help="data name", default='data_0829_8')
+    parser.add_argument("-s", "--start", type=int, default=200, help="start frame index")
+    parser.add_argument("-t", "--stop", type=int, default=900, help="stop frame index")
+    parser.add_argument("-p", "--step", type=int, default=10, help="frame index step")
+    return parser
+
 if __name__ == '__main__':
+    # Create the parser
+    parser = get_args_parser()
+    # Parse the arguments
+    args = parser.parse_args()
+
     # dataset dir
-    rootdir = 'C:/Projects/Code/Aurora_papers/data/arm_6cam'
-    datadir = os.path.join(rootdir, 'data_0829_8_undis256_sr')
-    outdir = os.path.join(rootdir, 'data_0829_8_recon')
+    rootdir = args.root
+    datadir = os.path.join(rootdir, f'{args.dataname}_undis256_sr')
+    outdir = os.path.join(rootdir, f'{args.dataname}_recon')
     os.makedirs(outdir, exist_ok=True)
     # dust3r dir name
     outdir_dust3r = os.path.join(outdir, 'dust3r_npy')
@@ -43,7 +58,7 @@ if __name__ == '__main__':
 
     # iterative over all the images
     cam_indices = ['0', '1', '2', '4', '5', '6']
-    for frame_idx in range(550, 901, 25):
+    for frame_idx in range(args.start, args.stop, args.step):
         # check if all the images exists
         isexist = True
         name_list = []
@@ -84,32 +99,3 @@ if __name__ == '__main__':
         ba_imgs = convert_dust3r_to_pano(imgs, focals, poses, pts3d, confidence_masks)
         result = pano_stitch(ba_imgs, outdir=outdir_pano, outname=framename,
             blender=multiband_blend, equalize=False, crop=False)
-
-    # # load images
-    # dirname = './data/9001gate'
-    # npyname = './data/9001gate.npy'
-    # name_list = [os.path.join(dirname,i) for i in os.listdir(dirname)]          
-    # images = load_images(name_list, size=512, square_ok=True)
-
-    # model_name = "checkpoints/DUSt3R_ViTLarge_BaseDecoder_512_dpt.pth"
-    # # you can put the path to a local checkpoint in model_name if needed
-    # model = AsymmetricCroCo3DStereo.from_pretrained(model_name).to(device)
-
-    # pairs = make_pairs(images, scene_graph='complete', prefilter=None, symmetrize=True)
-    # output = inference(pairs, model, device, batch_size=batch_size)
-
-    # # at this stage, you have the raw dust3r predictions
-    # view1, pred1 = output['view1'], output['pred1']
-    # view2, pred2 = output['view2'], output['pred2']
-
-    # scene = global_aligner(output, device=device, min_conf_thr=1.5, mode=GlobalAlignerMode.PointCloudOptimizer)
-    # scene.preset_focal([246.8 / 400.0 * 512.0]*len(name_list))
-    # loss = scene.compute_global_alignment(init="mst", niter=niter, schedule=schedule, lr=lr)
-    # focals = scene.get_focals()
-    # avg_focal = sum(focals)/len(focals)
-
-    # # save results
-    # viz_3d.save_dust3r_poses_and_depth(scene, npyname)
-
-    # viz_3d.draw_dust3r_scene(scene)
-    # viz_3d.draw_dust3r_match_ez(scene)

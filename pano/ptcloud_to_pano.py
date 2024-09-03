@@ -193,17 +193,13 @@ def pano_stitch(ba_images, outdir, outname, blender=no_blend, equalize=False, cr
     mesh = rgbdpano_to_ptmesh(mosaic_rgb, mosaic_dist[:, :, 0], mosaic_conf[:, :, 0], 
         im_range, resolution, ba_images[0].panocenter)
 
-    # save npy
-    with open(f'{outdir}/{outname}.npy', 'wb') as f:
-        np.save(f, mosaic_rgb)
-        np.save(f, mosaic_dist)
-        np.save(f, mosaic_conf)
     # save image
-    cv2.imwrite(f'{outdir}/{outname}.png', mosaic_rgb)
-    mosaic_dist_norm = mosaic_dist / np.max(mosaic_dist) * 255
-    cv2.imwrite(f'{outdir}/{outname}_dist.png', mosaic_dist_norm.astype(np.uint8))
-    mosaic_conf_norm = mosaic_conf / np.max(mosaic_conf) * 255
-    cv2.imwrite(f'{outdir}/{outname}_conf.png', mosaic_conf_norm.astype(np.uint8))
+    # cv2.imwrite(f'{outdir}/{outname}.png', mosaic_rgb)
+    # mosaic_dist_norm = mosaic_dist / np.max(mosaic_dist) * 255
+    # cv2.imwrite(f'{outdir}/{outname}_dist.png', mosaic_dist_norm.astype(np.uint8))
+    # mosaic_conf_norm = mosaic_conf / np.max(mosaic_conf) * 255
+    # cv2.imwrite(f'{outdir}/{outname}_conf.png', mosaic_conf_norm.astype(np.uint8))
+
     # save point cloud
     o3d.io.write_point_cloud(f'{outdir}/{outname}.ply', ptcloud)
     # save mesh
@@ -225,7 +221,14 @@ def pano_stitch(ba_images, outdir, outname, blender=no_blend, equalize=False, cr
     crop_image_rgb = crop_panorama_image(mosaic_rgb_full, theta=0.0, phi=90.0, res_x=512, res_y=512, fov=150.0, debug=False)
     cv2.imwrite(f'{outdir}/{outname}_top_view.png', crop_image_rgb)
 
-    return mosaic_rgb, mosaic_dist, mosaic_conf, resolution, im_range
+    # save npy
+    with open(f'{outdir}/{outname}.npy', 'wb') as f:
+        np.save(f, mosaic_rgb_full)
+        np.save(f, mosaic_dist_full)
+        np.save(f, mosaic_conf_full)
+        np.save(f, crop_image_rgb)
+
+    return mosaic_rgb_full, mosaic_dist_full, mosaic_conf_full, crop_image_rgb, resolution, im_range
 
 def main():
     # load data
