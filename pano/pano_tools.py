@@ -101,6 +101,37 @@ def convert_dust3r_to_pano(imgs, focals, poses, pts3d, confidence_masks):
         pano_images[idx].trans = extr_mat_new[:3, 3]
 
     return pano_images
+
+def remap_panorama_to_full(image, original_theta_range, original_phi_range):
+    # Unpack the original ranges
+    theta_1, theta_2 = original_theta_range
+    phi_1, phi_2 = original_phi_range
+
+    # compute new width and height
+    scale_width = 2 * np.pi / abs(theta_2 - theta_1)
+    scale_height = np.pi / abs(phi_2 - phi_1)
+    width_orig, height_orig = image.shape[1], image.shape[0]
+    width = round(width_orig * scale_width)
+    height = round(height_orig * scale_height)
+
+    theta = np.linspace(-np.pi, np.pi, width)
+    phi = np.linspace(-np.pi/2, np.pi/2, height)
+
+    # Generate original theta-phi grid for remapping
+    orig_theta = np.linspace(theta_1, theta_2, width_orig)
+    orig_phi = np.linspace(phi_1, phi_2, height_orig)
+
+    # # Meshgrid for remapping
+    # orig_theta_grid, orig_phi_grid = np.meshgrid(orig_theta, orig_phi)
+
+    # Map original image to the full theta-phi range
+    map_x = np.interp(theta, orig_theta, np.arange(width_orig))
+    map_y = np.interp(phi, orig_phi, np.arange(height_orig))
+    
+    map_x, map_y = np.meshgrid(map_x, map_y)
+    remapped_image = cv2.remap(image, map_x.astype(np.float32), map_y.astype(np.float32), cv2.INTER_LINEAR)
+
+    return remapped_image
     
 def pano_segment_sky(image):
     import cv2

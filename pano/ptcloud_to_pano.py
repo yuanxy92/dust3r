@@ -11,7 +11,7 @@ import cv2
 
 from .pano.stitcher import no_blend, _proj_img_range_border, _add_weights, estimate_resolution
 from .pano.stitcher import SphProj, no_blend, linear_blend, multiband_blend, no_blend
-from .pano_tools import PanoImage, _add_weights_single_channel, convert_dust3r_to_pano
+from .pano_tools import PanoImage, _add_weights_single_channel, convert_dust3r_to_pano, remap_panorama_to_full
 
 def rgbdpano_to_point_cloud(rgb_image, depth_image, conf_image, im_range, resolution):
     """
@@ -208,6 +208,19 @@ def pano_stitch(ba_images, outdir, outname, blender=no_blend, equalize=False, cr
     o3d.io.write_point_cloud(f'{outdir}/{outname}.ply', ptcloud)
     # save mesh
     o3d.io.write_triangle_mesh(f'{outdir}/{outname}_mesh.ply', mesh)
+
+    # extand panoramic image to full range
+    mosaic_rgb_full = remap_panorama_to_full(mosaic_rgb, (im_range[0][0], im_range[1][0]), 
+            (im_range[0][1], im_range[1][1]))
+    mosaic_dist_full = remap_panorama_to_full(mosaic_dist, (im_range[0][0], im_range[1][0]), 
+            (im_range[0][1], im_range[1][1]))
+    mosaic_conf_full = remap_panorama_to_full(mosaic_conf, (im_range[0][0], im_range[1][0]), 
+            (im_range[0][1], im_range[1][1]))
+    cv2.imwrite(f'{outdir}/{outname}_full.png', mosaic_rgb_full)
+    mosaic_dist_full_norm = mosaic_dist_full / np.max(mosaic_dist_full) * 255
+    cv2.imwrite(f'{outdir}/{outname}_dist_full.png', mosaic_dist_full_norm.astype(np.uint8))
+    mosaic_conf_full_norm = mosaic_conf_full / np.max(mosaic_conf_full) * 255
+    cv2.imwrite(f'{outdir}/{outname}_conf_full.png', mosaic_conf_full_norm.astype(np.uint8))
 
     return mosaic_rgb, mosaic_dist, mosaic_conf, resolution, im_range
 
