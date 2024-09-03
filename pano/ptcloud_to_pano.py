@@ -56,7 +56,7 @@ def compute_normal_view_direction_angle(v0, v1, v2, panocenter):
     view_direction /= np.linalg.norm(view_direction)
     # Compute the normal for this triangle
     normal = np.cross(v1 - v0, v2 - v0)
-    normal /= np.linalg.norm(normal)
+    normal = normal / np.linalg.norm(normal)
     # Compute the angle between the normal and the view direction
     angle = np.arccos(np.dot(normal, view_direction))
     angle_deg = np.degrees(angle)
@@ -106,7 +106,7 @@ def rgbdpano_to_ptmesh(rgb_image, depth_image, conf_image, im_range, resolution,
             if mask[v, u + 1] > 0 and mask[v + 1, u] > 0 and mask[v + 1, u + 1] > 0:
                 # Compute the face center
                 angle_deg = compute_normal_view_direction_angle(vertices[idx_right], 
-                    vertices[idx_down], vertices[idx_right], panocenter)
+                    vertices[idx_down], vertices[idx_down_right], panocenter)
                 if angle_deg < angle_th:
                     triangles.append([idx_right, idx_down, idx_down_right])
 
@@ -193,13 +193,6 @@ def pano_stitch(ba_images, outdir, outname, blender=no_blend, equalize=False, cr
     mesh = rgbdpano_to_ptmesh(mosaic_rgb, mosaic_dist[:, :, 0], mosaic_conf[:, :, 0], 
         im_range, resolution, ba_images[0].panocenter)
 
-    # save image
-    # cv2.imwrite(f'{outdir}/{outname}.png', mosaic_rgb)
-    # mosaic_dist_norm = mosaic_dist / np.max(mosaic_dist) * 255
-    # cv2.imwrite(f'{outdir}/{outname}_dist.png', mosaic_dist_norm.astype(np.uint8))
-    # mosaic_conf_norm = mosaic_conf / np.max(mosaic_conf) * 255
-    # cv2.imwrite(f'{outdir}/{outname}_conf.png', mosaic_conf_norm.astype(np.uint8))
-
     # save point cloud
     o3d.io.write_point_cloud(f'{outdir}/{outname}.ply', ptcloud)
     # save mesh
@@ -218,7 +211,7 @@ def pano_stitch(ba_images, outdir, outname, blender=no_blend, equalize=False, cr
     mosaic_conf_full_norm = mosaic_conf_full / np.max(mosaic_conf_full) * 255
     cv2.imwrite(f'{outdir}/{outname}_conf_full.png', mosaic_conf_full_norm.astype(np.uint8))
 
-    crop_image_rgb = crop_panorama_image(mosaic_rgb_full, theta=0.0, phi=90.0, res_x=512, res_y=512, fov=150.0, debug=False)
+    crop_image_rgb = crop_panorama_image(mosaic_rgb_full, theta=0.0, phi=90.0, res_x=1024, res_y=1024, fov=165.0, debug=False)
     cv2.imwrite(f'{outdir}/{outname}_top_view.png', crop_image_rgb)
 
     # save npy
