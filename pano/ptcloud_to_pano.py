@@ -58,8 +58,9 @@ def compute_normal_view_direction_angle(v0, v1, v2, panocenter):
     normal = np.cross(v1 - v0, v2 - v0)
     normal = normal / np.linalg.norm(normal)
     # Compute the angle between the normal and the view direction
-    angle = np.arccos(np.dot(normal, view_direction))
-    angle_deg = np.degrees(angle)
+    angle1 = np.arccos(np.dot(normal, view_direction))
+    angle2 = np.arccos(np.dot(-normal, view_direction))
+    angle_deg = min(np.degrees(angle1), np.degrees(angle2))
     return angle_deg
 
 def rgbdpano_to_ptmesh(rgb_image, depth_image, conf_image, im_range, resolution, panocenter, angle_th=85, conf_th=0.1):
@@ -106,9 +107,9 @@ def rgbdpano_to_ptmesh(rgb_image, depth_image, conf_image, im_range, resolution,
             if mask[v, u + 1] > 0 and mask[v + 1, u] > 0 and mask[v + 1, u + 1] > 0:
                 # Compute the face center
                 angle_deg = compute_normal_view_direction_angle(vertices[idx_right], 
-                    vertices[idx_down], vertices[idx_down_right], panocenter)
+                    vertices[idx_down_right], vertices[idx_down], panocenter)
                 if angle_deg < angle_th:
-                    triangles.append([idx_right, idx_down, idx_down_right])
+                    triangles.append([idx_right, idx_down_right, idx_down])
 
     triangles = np.array(triangles)
     # Create the mesh object
