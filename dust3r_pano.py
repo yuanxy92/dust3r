@@ -29,6 +29,9 @@ schedule = 'cosine'
 lr = 0.01
 niter = 300
 
+# os.environ['CUDA_DEVICE_ORDER']='PCI_BUS_ID'
+# os.environ['CUDA_VISIBLE_DEVICES']='7'
+
 def get_args_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("-r", "--root", type=str, help="data root dir", default='/data/xiaoyun/OV6946_Arm_6_cameras/20240829_256px_v2')

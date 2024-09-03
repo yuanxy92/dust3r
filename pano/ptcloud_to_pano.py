@@ -63,6 +63,18 @@ def compute_normal_view_direction_angle(v0, v1, v2, panocenter):
     angle_deg = min(np.degrees(angle1), np.degrees(angle2))
     return angle_deg
 
+def get_mask_index_array(binary_array):
+    # Create an array of the same length with default value -1
+    index_array = np.full(len(binary_array), -1)
+    # Counter to track the number of True elements encountered
+    true_count = 0
+    # Iterate through the binary_array
+    for i, value in enumerate(binary_array):
+        if value:
+            index_array[i] = true_count
+            true_count += 1
+    return index_array
+
 def rgbdpano_to_ptmesh(rgb_image, depth_image, conf_image, im_range, resolution, panocenter, angle_th=85, conf_th=0.1):
     """
     Convert RGB and Depth images into a point cloud
@@ -91,34 +103,39 @@ def rgbdpano_to_ptmesh(rgb_image, depth_image, conf_image, im_range, resolution,
     colors = rgb_image.reshape(-1, 3) / 255.0  # normalize RGB values
     colors = np.flip(colors, axis=1)
     mask_binary = mask.reshape(-1,).astype(bool)
+    # re-calculate the index based on the mask
+    vertices_selected = vertices[mask_binary]
+    colors_selected = colors[mask_binary]
+    index_array = get_mask_index_array(mask_binary)
     # Iterate over all the pixels
     for v in range(height - 1):
         for u in range(width - 1):
-            idx = v * width + u
-            idx_right = idx + 1
-            idx_down = idx + width
-            idx_down_right = idx + width + 1
+            orig_idx = v * width + u
+            idx = index_array[orig_idx]
+            idx_right = index_array[orig_idx + 1]
+            idx_down = index_array[orig_idx + width]
+            idx_down_right = index_array[orig_idx + width + 1]
             if mask[v, u] > 0 and mask[v + 1, u] > 0 and mask[v, u + 1] > 0:
                 # Compute the face center
-                angle_deg = compute_normal_view_direction_angle(vertices[idx], 
-                    vertices[idx_right], vertices[idx_down], panocenter)
+                angle_deg = compute_normal_view_direction_angle(vertices_selected[idx], 
+                    vertices_selected[idx_right], vertices_selected[idx_down], panocenter)
                 if angle_deg < angle_th:
-                    triangles.append([idx, idx_down, idx_right])
+                    triangles.append([idx, idx_right, idx_down])
             if mask[v, u + 1] > 0 and mask[v + 1, u] > 0 and mask[v + 1, u + 1] > 0:
                 # Compute the face center
-                angle_deg = compute_normal_view_direction_angle(vertices[idx_right], 
-                    vertices[idx_down_right], vertices[idx_down], panocenter)
+                angle_deg = compute_normal_view_direction_angle(vertices_selected[idx_right], 
+                    vertices_selected[idx_down_right], vertices_selected[idx_down], panocenter)
                 if angle_deg < angle_th:
                     triangles.append([idx_right, idx_down_right, idx_down])
 
     triangles = np.array(triangles)
     # Create the mesh object
     mesh = o3d.geometry.TriangleMesh()
-    mesh.vertices = o3d.utility.Vector3dVector(vertices)
+    mesh.vertices = o3d.utility.Vector3dVector(vertices_selected)
     mesh.triangles = o3d.utility.Vector3iVector(triangles)
-    mesh.vertex_colors = o3d.utility.Vector3dVector(colors)
+    mesh.vertex_colors = o3d.utility.Vector3dVector(colors_selected)
     # Optionally, compute vertex normals
-    mesh.compute_vertex_normals()
+    # mesh.compute_vertex_normals()
     return mesh
 
 def pano_stitch(ba_images, outdir, outname, blender=no_blend, equalize=False, crop=False):
@@ -195,7 +212,7 @@ def pano_stitch(ba_images, outdir, outname, blender=no_blend, equalize=False, cr
         im_range, resolution, ba_images[0].panocenter)
 
     # save point cloud
-    o3d.io.write_point_cloud(f'{outdir}/{outname}.ply', ptcloud)
+    # o3d.io.write_point_cloud(f'{outdir}/{outname}.ply', ptcloud)
     # save mesh
     o3d.io.write_triangle_mesh(f'{outdir}/{outname}_mesh.ply', mesh)
 
@@ -215,12 +232,12 @@ def pano_stitch(ba_images, outdir, outname, blender=no_blend, equalize=False, cr
     crop_image_rgb = crop_panorama_image(mosaic_rgb_full, theta=0.0, phi=90.0, res_x=1024, res_y=1024, fov=165.0, debug=False)
     cv2.imwrite(f'{outdir}/{outname}_top_view.png', crop_image_rgb)
 
-    # save npy
-    with open(f'{outdir}/{outname}.npy', 'wb') as f:
-        np.save(f, mosaic_rgb_full)
-        np.save(f, mosaic_dist_full)
-        np.save(f, mosaic_conf_full)
-        np.save(f, crop_image_rgb)
+    # # save npy
+    # with open(f'{outdir}/{outname}.npy', 'wb') as f:
+    #     np.save(f, mosaic_rgb_full)
+    #     np.save(f, mosaic_dist_full)
+    #     np.save(f, mosaic_conf_full)
+    #     np.save(f, crop_image_rgb)
 
     return mosaic_rgb_full, mosaic_dist_full, mosaic_conf_full, crop_image_rgb, resolution, im_range
 
