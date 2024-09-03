@@ -11,7 +11,7 @@ import cv2
 
 from .pano.stitcher import no_blend, _proj_img_range_border, _add_weights, estimate_resolution
 from .pano.stitcher import SphProj, no_blend, linear_blend, multiband_blend, no_blend
-from .pano_tools import PanoImage, _add_weights_single_channel, convert_dust3r_to_pano, remap_panorama_to_full
+from .pano_tools import PanoImage, _add_weights_single_channel, convert_dust3r_to_pano, remap_panorama_to_full, crop_panorama_image
 
 def rgbdpano_to_point_cloud(rgb_image, depth_image, conf_image, im_range, resolution):
     """
@@ -221,6 +221,9 @@ def pano_stitch(ba_images, outdir, outname, blender=no_blend, equalize=False, cr
     cv2.imwrite(f'{outdir}/{outname}_dist_full.png', mosaic_dist_full_norm.astype(np.uint8))
     mosaic_conf_full_norm = mosaic_conf_full / np.max(mosaic_conf_full) * 255
     cv2.imwrite(f'{outdir}/{outname}_conf_full.png', mosaic_conf_full_norm.astype(np.uint8))
+
+    crop_image_rgb = crop_panorama_image(mosaic_rgb_full, theta=0.0, phi=90.0, res_x=512, res_y=512, fov=150.0, debug=False)
+    cv2.imwrite(f'{outdir}/{outname}_top_view.png', crop_image_rgb)
 
     return mosaic_rgb, mosaic_dist, mosaic_conf, resolution, im_range
 

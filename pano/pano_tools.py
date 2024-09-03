@@ -134,7 +134,7 @@ def remap_panorama_to_full(image, original_theta_range, original_phi_range):
 
     return remapped_image
 
-def crop_panorama_image(img, theta=0.0, phi=0.0, res_x=512, res_y=512, fov=60.0, debug=False):
+def crop_panorama_image(img, theta=0.0, phi=90.0, res_x=512, res_y=512, fov=120.0, debug=False):
     img_x = img.shape[0]
     img_y = img.shape[1]
 
