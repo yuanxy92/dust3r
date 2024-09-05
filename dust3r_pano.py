@@ -51,6 +51,13 @@ if __name__ == '__main__':
     rootdir = args.root
     datadir = os.path.join(rootdir, f'{args.dataname}_undis256_sr')
     outdir = os.path.join(rootdir, f'{args.dataname}_recon')
+    maskdir = os.path.join(rootdir, f'{args.dataname}_undis256_sr_mask')
+    has_mask = False
+    if os.path.isdir(maskdir):
+        has_mask = True
+        print(f'\nSkymask {maskdir} detected!\n')
+    else:
+        print(f'\nSkymask {maskdir} not detected!\n')
     os.makedirs(outdir, exist_ok=True)
     # dust3r dir name
     outdir_dust3r = os.path.join(outdir, 'dust3r_npy')
@@ -65,10 +72,15 @@ if __name__ == '__main__':
         # check if all the images exists
         isexist = True
         name_list = []
+        if has_mask:
+            skymasks = []
         for cam_idx in cam_indices:
             filename = os.path.join(datadir, f'camera_{cam_idx}_frame_{frame_idx}_corrected.png')
             isexist = isexist and os.path.isfile(filename)
             name_list.append(filename)
+            if has_mask:
+                maskname = os.path.join(maskdir, f'camera_{cam_idx}_frame_{frame_idx}_mask.png')
+                skymasks.append(cv2.imread(maskname))
         if isexist == False:
             continue
 
@@ -99,6 +111,9 @@ if __name__ == '__main__':
             pts3d = np.load(f)
             confidence_masks = np.load(f)
         # generate bundle adjust image
-        ba_imgs = convert_dust3r_to_pano(imgs, focals, poses, pts3d, confidence_masks)
+        if has_mask:
+            ba_imgs = convert_dust3r_to_pano(imgs, focals, poses, pts3d, confidence_masks, skymasks)
+        else:
+            ba_imgs = convert_dust3r_to_pano(imgs, focals, poses, pts3d, confidence_masks)
         result = pano_stitch(ba_imgs, outdir=outdir_pano, outname=framename,
             blender=multiband_blend, equalize=False, crop=False)

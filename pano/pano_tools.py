@@ -28,6 +28,7 @@ class PanoImage:
     distimg: np.ndarray
     panocenter: np.ndarray = None
     range: tuple = (np.zeros(2), np.zeros(2))
+    skymask: np.ndarray = None
 
     def hom(self):
         """Homography from pixel to normalized coordinates."""
@@ -61,14 +62,19 @@ def compute_center_of_camera_arrays(pano_images):
     camera_center = camera_center / len(pano_images)
     return camera_center
 
-def convert_dust3r_to_pano(imgs, focals, poses, pts3d, confidence_masks):
+def convert_dust3r_to_pano(imgs, focals, poses, pts3d, confidence_masks, skymasks = None):
     # init images
     pano_images = []
     for idx in range(len(imgs)):
         rotation_mat = poses[idx][:3, :3]
         trans_mat = poses[idx][:3, 3]
-        pano_image = PanoImage(img=imgs[idx], rot=rotation_mat.transpose(), trans=trans_mat,
-            intr=intrinsics(focals[idx], (0, 0)), pts3d=pts3d[idx], confidence_mask=confidence_masks[idx], distimg=None)
+        if skymasks is not None:
+            skymask = skymasks[idx]
+            pano_image = PanoImage(img=imgs[idx], rot=rotation_mat.transpose(), trans=trans_mat,
+                intr=intrinsics(focals[idx], (0, 0)), pts3d=pts3d[idx], confidence_mask=confidence_masks[idx], distimg=None, skymask=skymask)
+        else:
+            pano_image = PanoImage(img=imgs[idx], rot=rotation_mat.transpose(), trans=trans_mat,
+                intr=intrinsics(focals[idx], (0, 0)), pts3d=pts3d[idx], confidence_mask=confidence_masks[idx], distimg=None)
         pano_images.append(pano_image)
     
     # compute center of all the cameras
