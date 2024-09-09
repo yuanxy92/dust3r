@@ -12,15 +12,9 @@
             "console": "integratedTerminal",
             "args": [
                 "--root", 
-                "/data/xiaoyun/OV6946_Arm_6_cameras/20240829_256px_v2",
+                "/home/luvision/project/Code/data/Aurora/Fig_3/20240909_1",
                 "--dataname",
-                "data_0829_8",
-                "--start", 
-                "310", 
-                "--stop", 
-                "315", 
-                "--step", 
-                "1"
+                "concave"
             ]
         }
     ]

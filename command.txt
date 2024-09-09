@@ -1,1 +1,2 @@
 python demo.py --weights ./checkpoints/DUSt3R_ViTLarge_BaseDecoder_512_dpt.pth
+python convert_dust3r_to_3dgs.py --root /home/luvision/project/Code/data/Aurora/Fig_3/20240909_2 --dataname concave
