@@ -74,6 +74,9 @@ def convert_dust3r_cameras_to_colmap_cameras(scene, imgnames, outdir):
     # compute scale in dust3r
     img_temp = cv2.imread(imgnames[0])
     scale = img_temp.shape[0] / imgs[0].shape[0]
+    orig_w = int(img_temp.shape[1])
+    orig_h = int(img_temp.shape[0])
+    scale_3dpts = 50
 
     # convert cameras
     colmap_cameras = []
@@ -81,8 +84,8 @@ def convert_dust3r_cameras_to_colmap_cameras(scene, imgnames, outdir):
         camera = ct.Camera(
             idx + 1, 
             "PINHOLE", 
-            imgs[idx].shape[1] * scale, 
-            imgs[idx].shape[0] * scale,
+            orig_w, 
+            orig_h,
             [focals[idx] * scale, focals[idx] * scale, 
              imgs[idx].shape[1] / 2 * scale, imgs[idx].shape[0] / 2 * scale]
             )
@@ -90,6 +93,7 @@ def convert_dust3r_cameras_to_colmap_cameras(scene, imgnames, outdir):
     # write cameras
     camera_pathname = os.path.join(outdir_colmap_sparse, 'cameras.txt')
     ct.write_cameras_text(colmap_cameras, camera_pathname)
+    ct.write_cameras_binary(colmap_cameras, os.path.join(outdir_colmap_sparse, 'cameras.bin'))
 
     # convert images
     colmap_images = []
@@ -98,12 +102,12 @@ def convert_dust3r_cameras_to_colmap_cameras(scene, imgnames, outdir):
         pose = poses[idx]
         rotation_mat = poses[idx][:3, :3]
         rotation_mat = rotation_mat.transpose()
-        tvec = poses[idx][:3, 3]
+        tvec = - rotation_mat @ poses[idx][:3, 3]
         qvec = ct.rotmat2qvec(rotation_mat)
         image = ct.BaseImage(
             idx + 1,
             qvec,
-            tvec,
+            tvec * scale_3dpts,
             idx + 1,
             basename,
             [],
@@ -115,6 +119,7 @@ def convert_dust3r_cameras_to_colmap_cameras(scene, imgnames, outdir):
     # write images
     image_pathname = os.path.join(outdir_colmap_sparse, 'images.txt')
     ct.write_images_text(colmap_images, image_pathname)
+    ct.write_images_binary(colmap_images, os.path.join(outdir_colmap_sparse, 'images.bin'))
 
     # generate 3d points
     pts3d = scene.get_pts3d()
@@ -125,7 +130,6 @@ def convert_dust3r_cameras_to_colmap_cameras(scene, imgnames, outdir):
         pts2d_all_list.append(xy_grid(*imgs[i].shape[:2][::-1])[conf_i])  # imgs[i].shape[:2] = (H, W)
         pts3d_all_list.append(pts3d[i][conf_i])
         img = imgs[i]
-        H,W = img.shape[:2]
         for pos in pts2d_all_list[i]:
             x,y = pos
             all_rgbs.append(img[y,x,:])
@@ -135,10 +139,10 @@ def convert_dust3r_cameras_to_colmap_cameras(scene, imgnames, outdir):
     vis_rgbs = [all_rgbs[idx] for idx in idx_to_viz]
     vis_xyzs = all_pts3d[idx_to_viz]
     points3D = o3d.geometry.PointCloud()
-    points3D.points = o3d.utility.Vector3dVector(vis_xyzs)
+    points3D.points = o3d.utility.Vector3dVector(vis_xyzs * scale_3dpts)
     points3D.colors = o3d.utility.Vector3dVector(vis_rgbs)
     # write 3d points
-    pt3d_pathname = os.path.join(outdir_colmap_sparse, 'points3D.ply')
+    pt3d_pathname = os.path.join(outdir_colmap_sparse, 'points3D2.ply')
     o3d.io.write_point_cloud(pt3d_pathname, points3D)
 
 
