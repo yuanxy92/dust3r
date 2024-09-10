@@ -4,8 +4,6 @@ from dust3r.utils.image import load_images
 from dust3r.image_pairs import make_pairs
 from dust3r.cloud_opt import global_aligner, GlobalAlignerMode
 from dust3r.viz import show_raw_pointcloud,cat_3d
-from pano.pano.stitcher import SphProj, no_blend, linear_blend, multiband_blend, no_blend
-from pano.ptcloud_to_pano import convert_dust3r_to_pano, pano_stitch
 
 from matplotlib import pyplot as pl
 import os
@@ -22,6 +20,8 @@ import copy
 import viz_3d
 import shutil
 import argparse
+
+from colmapio import *
 
 device = 'cuda'
 batch_size = 1
@@ -84,6 +84,9 @@ def main():
     avg_focal = sum(focals)/len(focals)
     # save results
     viz_3d.save_dust3r_poses_and_depth(scene, out_dust3r)
+
+    # save to colmap results
+    
 
 if __name__ == '__main__':
     main()
