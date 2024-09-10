@@ -12,7 +12,7 @@
             "console": "integratedTerminal",
             "args": [
                 "--root", 
-                "/home/luvision/project/Code/data/Aurora/Fig_3/20240909_1",
+                "/home/luvision/project/Code/data/Aurora/Fig_3/20240909_2",
                 "--dataname",
                 "concave"
             ]

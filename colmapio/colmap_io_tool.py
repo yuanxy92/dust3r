@@ -4,7 +4,6 @@ import numpy as np
 import struct
 import argparse
 
-
 CameraModel = collections.namedtuple(
     "CameraModel", ["model_id", "model_name", "num_params"]
 )
@@ -16,6 +15,25 @@ BaseImage = collections.namedtuple(
 )
 Point3D = collections.namedtuple(
     "Point3D", ["id", "xyz", "rgb", "error", "image_ids", "point2D_idxs"]
+)
+CAMERA_MODELS = {
+    CameraModel(model_id=0, model_name="SIMPLE_PINHOLE", num_params=3),
+    CameraModel(model_id=1, model_name="PINHOLE", num_params=4),
+    CameraModel(model_id=2, model_name="SIMPLE_RADIAL", num_params=4),
+    CameraModel(model_id=3, model_name="RADIAL", num_params=5),
+    CameraModel(model_id=4, model_name="OPENCV", num_params=8),
+    CameraModel(model_id=5, model_name="OPENCV_FISHEYE", num_params=8),
+    CameraModel(model_id=6, model_name="FULL_OPENCV", num_params=12),
+    CameraModel(model_id=7, model_name="FOV", num_params=5),
+    CameraModel(model_id=8, model_name="SIMPLE_RADIAL_FISHEYE", num_params=4),
+    CameraModel(model_id=9, model_name="RADIAL_FISHEYE", num_params=5),
+    CameraModel(model_id=10, model_name="THIN_PRISM_FISHEYE", num_params=12),
+}
+CAMERA_MODEL_IDS = dict(
+    [(camera_model.model_id, camera_model) for camera_model in CAMERA_MODELS]
+)
+CAMERA_MODEL_NAMES = dict(
+    [(camera_model.model_name, camera_model) for camera_model in CAMERA_MODELS]
 )
 
 def qvec2rotmat(qvec):
@@ -75,7 +93,7 @@ def write_cameras_text(cameras, path):
     )
     with open(path, "w") as fid:
         fid.write(HEADER)
-        for _, cam in cameras.items():
+        for cam in cameras:
             to_write = [cam.id, cam.model, cam.width, cam.height, *cam.params]
             line = " ".join([str(elem) for elem in to_write])
             fid.write(line + "\n")
@@ -90,7 +108,7 @@ def write_images_text(images, path):
         mean_observations = 0
     else:
         mean_observations = sum(
-            (len(img.point3D_ids) for _, img in images.items())
+            (len(img.point3D_ids) for img in images)
         ) / len(images)
     HEADER = (
         "# Image list with two lines of data per image:\n"
@@ -103,7 +121,7 @@ def write_images_text(images, path):
 
     with open(path, "w") as fid:
         fid.write(HEADER)
-        for _, img in images.items():
+        for img in images:
             image_header = [
                 img.id,
                 *img.qvec,
