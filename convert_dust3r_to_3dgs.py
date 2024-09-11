@@ -20,6 +20,7 @@ import copy
 import viz_3d
 import shutil
 import argparse
+import pymeshlab
 
 from colmapio import colmap_io_tool as ct
 
@@ -97,9 +98,10 @@ def convert_dust3r_cameras_to_colmap_cameras(scene, imgnames, outdir):
 
     # convert images
     colmap_images = []
+    camera_positions = []
     for idx in range(len(imgs)):
         basename = os.path.basename(imgnames[idx])
-        pose = poses[idx]
+        # inverse RT matrix 
         rotation_mat = poses[idx][:3, :3]
         rotation_mat = rotation_mat.transpose()
         tvec = - rotation_mat @ poses[idx][:3, 3]
@@ -113,6 +115,8 @@ def convert_dust3r_cameras_to_colmap_cameras(scene, imgnames, outdir):
             [],
             []
         )
+        camera_position = -rotation_mat.transpose() @ tvec
+        camera_positions.append(camera_position)
         colmap_images.append(image)
         # copy images
         shutil.copyfile(imgnames[idx], os.path.join(outdir_colmap_images, basename))
@@ -124,7 +128,8 @@ def convert_dust3r_cameras_to_colmap_cameras(scene, imgnames, outdir):
     # generate 3d points
     pts3d = scene.get_pts3d()
     pts3d = [pts.detach().cpu().numpy() for pts in pts3d]
-    pts2d_all_list, pts3d_all_list, all_rgbs = [], [], []
+    # add points with high confidence
+    pts2d_all_list, pts3d_all_list, all_rgbs_high = [], [], []
     for i in range(len(imgs)):
         conf_i = confidence_masks[i]
         pts2d_all_list.append(xy_grid(*imgs[i].shape[:2][::-1])[conf_i])  # imgs[i].shape[:2] = (H, W)
@@ -132,9 +137,28 @@ def convert_dust3r_cameras_to_colmap_cameras(scene, imgnames, outdir):
         img = imgs[i]
         for pos in pts2d_all_list[i]:
             x,y = pos
-            all_rgbs.append(img[y,x,:])
-    all_pts3d = np.concatenate(pts3d_all_list, axis=0)
-    n_viz = min(80000, len(all_rgbs))
+            all_rgbs_high.append(img[y,x,:])
+    all_pts3d_high = np.concatenate(pts3d_all_list, axis=0)
+
+    # add points with low confidence
+    pts2d_all_list, pts3d_all_list, all_rgbs_low = [], [], []
+    for i in range(len(imgs)):
+        conf_i = np.logical_not(confidence_masks[i])
+        pts2d_all_list.append(xy_grid(*imgs[i].shape[:2][::-1])[conf_i])  # imgs[i].shape[:2] = (H, W)
+        pts3d_all_list.append(pts3d[i][conf_i])
+        img = imgs[i]
+        for pos in pts2d_all_list[i]:
+            x,y = pos
+            all_rgbs_low.append(img[y,x,:])
+        # scale pts3d_all_list
+        pts3d_all_list[i] = pts3d_all_list[i] - camera_position
+        pts3d_all_list[i] = pts3d_all_list[i] * 5 + camera_position
+    all_pts3d_low = np.concatenate(pts3d_all_list, axis=0)
+
+    # concate to generate the final pts3d and rgb
+    all_pts3d = np.concatenate([all_pts3d_high, all_pts3d_low], axis=0)
+    all_rgbs = np.concatenate([all_rgbs_high, all_rgbs_low], axis=0)
+    n_viz = min(160000, len(all_rgbs))
     idx_to_viz = list(np.round(np.linspace(0, len(all_rgbs)-1, n_viz)).astype(int))
     vis_rgbs = [all_rgbs[idx] for idx in idx_to_viz]
     vis_xyzs = all_pts3d[idx_to_viz]
@@ -142,8 +166,14 @@ def convert_dust3r_cameras_to_colmap_cameras(scene, imgnames, outdir):
     points3D.points = o3d.utility.Vector3dVector(vis_xyzs * scale_3dpts)
     points3D.colors = o3d.utility.Vector3dVector(vis_rgbs)
     # write 3d points
-    pt3d_pathname = os.path.join(outdir_colmap_sparse, 'points3D2.ply')
+    pt3d_pathname = os.path.join(outdir_colmap_sparse, 'points3D_o3d.ply')
     o3d.io.write_point_cloud(pt3d_pathname, points3D)
+
+    ms = pymeshlab.MeshSet()
+    ms.load_new_mesh(pt3d_pathname)
+    # Save the mesh as a new PLY file
+    ms.save_current_mesh(os.path.join(outdir_colmap_sparse, 'points3D.ply'))
+    ms.save_current_mesh(os.path.join(outdir_colmap_sparse, 'points3d.ply'))
 
 
 def main():
