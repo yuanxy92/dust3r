@@ -20,8 +20,7 @@ import copy
 import viz_3d
 import shutil
 import argparse
-import pymeshlab
-
+from plyfile import PlyData, PlyElement
 from colmapio import colmap_io_tool as ct
 
 device = 'cuda'
@@ -35,6 +34,22 @@ def get_args_parser():
     parser.add_argument("-r", "--root", type=str, help="data root dir", default='/data/xiaoyun/OV6946_Arm_6_cameras/20240829_256px_v2')
     parser.add_argument("-d", "--dataname", type=str, help="data name", default='data_0829_8')
     return parser
+
+def storePly(path, xyz, rgb):
+    # Define the dtype for the structured array
+    dtype = [('x', 'f4'), ('y', 'f4'), ('z', 'f4'),
+            ('nx', 'f4'), ('ny', 'f4'), ('nz', 'f4'),
+            ('red', 'u1'), ('green', 'u1'), ('blue', 'u1')]
+    normals = np.zeros_like(xyz)
+
+    elements = np.empty(xyz.shape[0], dtype=dtype)
+    attributes = np.concatenate((xyz, normals, rgb), axis=1)
+    elements[:] = list(map(tuple, attributes))
+
+    # Create the PlyData object and write to file
+    vertex_element = PlyElement.describe(elements, 'vertex')
+    ply_data = PlyData([vertex_element])
+    ply_data.write(path)
 
 def list_all_files(folder_path):
     try:
@@ -137,7 +152,7 @@ def convert_dust3r_cameras_to_colmap_cameras(scene, imgnames, outdir):
         img = imgs[i]
         for pos in pts2d_all_list[i]:
             x,y = pos
-            all_rgbs_high.append(img[y,x,:])
+            all_rgbs_high.append(img[y,x,:] * 255.0)
     all_pts3d_high = np.concatenate(pts3d_all_list, axis=0)
 
     # add points with low confidence
@@ -149,7 +164,7 @@ def convert_dust3r_cameras_to_colmap_cameras(scene, imgnames, outdir):
         img = imgs[i]
         for pos in pts2d_all_list[i]:
             x,y = pos
-            all_rgbs_low.append(img[y,x,:])
+            all_rgbs_low.append(img[y,x,:] * 255.0)
         # scale pts3d_all_list
         pts3d_all_list[i] = pts3d_all_list[i] - camera_position
         pts3d_all_list[i] = pts3d_all_list[i] * 5 + camera_position
@@ -161,19 +176,14 @@ def convert_dust3r_cameras_to_colmap_cameras(scene, imgnames, outdir):
     n_viz = min(160000, len(all_rgbs))
     idx_to_viz = list(np.round(np.linspace(0, len(all_rgbs)-1, n_viz)).astype(int))
     vis_rgbs = [all_rgbs[idx] for idx in idx_to_viz]
-    vis_xyzs = all_pts3d[idx_to_viz]
-    points3D = o3d.geometry.PointCloud()
-    points3D.points = o3d.utility.Vector3dVector(vis_xyzs * scale_3dpts)
-    points3D.colors = o3d.utility.Vector3dVector(vis_rgbs)
-    # write 3d points
-    pt3d_pathname = os.path.join(outdir_colmap_sparse, 'points3D_o3d.ply')
-    o3d.io.write_point_cloud(pt3d_pathname, points3D)
+    vis_xyzs = all_pts3d[idx_to_viz].astype(np.float32)
 
-    ms = pymeshlab.MeshSet()
-    ms.load_new_mesh(pt3d_pathname)
-    # Save the mesh as a new PLY file
-    ms.save_current_mesh(os.path.join(outdir_colmap_sparse, 'points3D.ply'))
-    ms.save_current_mesh(os.path.join(outdir_colmap_sparse, 'points3d.ply'))
+    pt3d_pathname = os.path.join(outdir_colmap_sparse, 'points3D_o3d.ply')
+    storePly(pt3d_pathname, vis_xyzs * scale_3dpts, vis_rgbs)
+    pt3d_pathname = os.path.join(outdir_colmap_sparse, 'points3D.ply')
+    storePly(pt3d_pathname, vis_xyzs * scale_3dpts, vis_rgbs)
+    pt3d_pathname = os.path.join(outdir_colmap_sparse, 'points3d.ply')
+    storePly(pt3d_pathname, vis_xyzs * scale_3dpts, vis_rgbs)
 
 
 def main():
