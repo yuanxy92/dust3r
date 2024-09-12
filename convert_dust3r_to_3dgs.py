@@ -35,6 +35,23 @@ def get_args_parser():
     parser.add_argument("-d", "--dataname", type=str, help="data name", default='data_0829_8')
     return parser
 
+def project_3d_2d(R,T,f,cx,cy,p):
+    x,y,z = R @ p + T
+    u = int((f * x)/ z + cx)
+    v = int((f * y) / z + cy)
+    return u,v,z
+
+def generate_depth_map(pt_map,R,T,f,cx,cy):
+    depth = np.zeros_like(pt_map[:,:,2])
+    for i in range(pt_map.shape[0]):
+        for j in range(pt_map.shape[1]):
+            p = pt_map[i,j,:]
+            # if p[-1] == 1:
+            #     z = 1
+            u,v,z = project_3d_2d(R,T,f,cx,cy,p)
+            depth[i,j] = z
+    return depth
+
 def storePly(path, xyz, rgb):
     # Define the dtype for the structured array
     dtype = [('x', 'f4'), ('y', 'f4'), ('z', 'f4'),
@@ -84,14 +101,18 @@ def convert_dust3r_cameras_to_colmap_cameras(scene, imgnames, outdir):
     outdir_colmap = os.path.join(outdir, 'colmap')
     outdir_colmap_sparse = os.path.join(outdir_colmap, 'sparse/0')
     outdir_colmap_images = os.path.join(outdir_colmap, 'images')
+    outdir_colmap_depths = os.path.join(outdir_colmap, 'depths')
     os.makedirs(outdir_colmap_sparse, exist_ok=True)
     os.makedirs(outdir_colmap_images, exist_ok=True)
+    os.makedirs(outdir_colmap_depths, exist_ok=True)
 
     # compute scale in dust3r
     img_temp = cv2.imread(imgnames[0])
     scale = img_temp.shape[0] / imgs[0].shape[0]
     orig_w = int(img_temp.shape[1])
     orig_h = int(img_temp.shape[0])
+    current_w = int(imgs[0].shape[1])
+    current_h = int(imgs[0].shape[0])
     scale_3dpts = 50
 
     # convert cameras
@@ -113,6 +134,8 @@ def convert_dust3r_cameras_to_colmap_cameras(scene, imgnames, outdir):
 
     # convert images
     colmap_images = []
+    colmap_rots = []
+    colmap_trans = []
     camera_positions = []
     for idx in range(len(imgs)):
         basename = os.path.basename(imgnames[idx])
@@ -130,11 +153,14 @@ def convert_dust3r_cameras_to_colmap_cameras(scene, imgnames, outdir):
             [],
             []
         )
+        colmap_rots.append(rotation_mat)
+        colmap_trans.append(tvec)
         camera_position = -rotation_mat.transpose() @ tvec
         camera_positions.append(camera_position)
         colmap_images.append(image)
         # copy images
         shutil.copyfile(imgnames[idx], os.path.join(outdir_colmap_images, basename))
+
     # write images
     image_pathname = os.path.join(outdir_colmap_sparse, 'images.txt')
     ct.write_images_text(colmap_images, image_pathname)
@@ -176,15 +202,30 @@ def convert_dust3r_cameras_to_colmap_cameras(scene, imgnames, outdir):
     n_viz = min(160000, len(all_rgbs))
     idx_to_viz = list(np.round(np.linspace(0, len(all_rgbs)-1, n_viz)).astype(int))
     vis_rgbs = [all_rgbs[idx] for idx in idx_to_viz]
-    vis_xyzs = all_pts3d[idx_to_viz].astype(np.float32)
+    vis_xyzs = all_pts3d[idx_to_viz].astype(np.float32) * scale_3dpts
 
     pt3d_pathname = os.path.join(outdir_colmap_sparse, 'points3D_o3d.ply')
-    storePly(pt3d_pathname, vis_xyzs * scale_3dpts, vis_rgbs)
+    storePly(pt3d_pathname, vis_xyzs, vis_rgbs)
     pt3d_pathname = os.path.join(outdir_colmap_sparse, 'points3D.ply')
-    storePly(pt3d_pathname, vis_xyzs * scale_3dpts, vis_rgbs)
+    storePly(pt3d_pathname, vis_xyzs, vis_rgbs)
     pt3d_pathname = os.path.join(outdir_colmap_sparse, 'points3d.ply')
-    storePly(pt3d_pathname, vis_xyzs * scale_3dpts, vis_rgbs)
+    storePly(pt3d_pathname, vis_xyzs, vis_rgbs)
 
+    # generate depth maps
+    for idx in range(len(imgs)):
+        basename = os.path.basename(imgnames[idx])[:-4]
+        conf_i = confidence_masks[idx] 
+        pt_map = pts3d[idx]
+        # convert point clouds to depth maps
+        depthimage = generate_depth_map(pt_map, colmap_rots[idx], colmap_trans[idx], 
+            focals[idx], current_w / 2, current_h / 2)
+        depthimage = depthimage * scale_3dpts
+        # depthimage[conf_i == False] = 1.0
+        depthfilename = os.path.join(outdir_colmap_depths, f'{basename}.npy')
+        with open(depthfilename, 'wb') as f:
+            np.save(f, depthimage)
+        depthimage_visual = (depthimage / np.max(depthimage) * 255).astype(np.uint8)
+        cv2.imwrite(os.path.join(outdir_colmap_depths, f'{basename}.png'), depthimage_visual)
 
 def main():
     # Create the parser
