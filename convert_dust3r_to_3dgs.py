@@ -139,7 +139,7 @@ def convert_dust3r_cameras_to_colmap_cameras(scene, imgnames, outdir):
     camera_positions = []
     for idx in range(len(imgs)):
         basename = os.path.basename(imgnames[idx])
-        # inverse RT matrix 
+        # inverse RT matrix, from cam2world to world2cam 
         rotation_mat = poses[idx][:3, :3]
         rotation_mat = rotation_mat.transpose()
         tvec = - rotation_mat @ poses[idx][:3, 3]
