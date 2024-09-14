@@ -4,7 +4,9 @@ import scipy.io as sio
 from typing import Optional
 import numpy as np
 import plotly.graph_objects as go
+from plotly.graph_objects import Layout
 from matplotlib import pyplot as pl
+from plyfile import PlyData, PlyElement
 
 def to_homogeneous(points):
     pad = np.ones((points.shape[:-1] + (1,)), dtype=points.dtype)
@@ -12,23 +14,30 @@ def to_homogeneous(points):
 
 def init_figure(height: int = 800) -> go.Figure:
     """Initialize a 3D figure."""
-    fig = go.Figure()
+    layout = Layout(plot_bgcolor='rgba(0,0,0,0)')
+    fig = go.Figure(layout=layout)
     axes = dict(
-        visible=False,
-        showbackground=False,
-        showgrid=False,
-        showline=False,
+        visible=True,
+        showbackground=True,
+        showgrid=True,
+        showline=True,
         showticklabels=True,
         autorange=True,
+        backgroundcolor='white',
+        # gridcolor='white',
+        zerolinecolor='white',
+        linecolor='black',
+        linewidth=2,
+        tickfont=dict(family='Arial', size=15)
     )
     fig.update_layout(
-        template="plotly_dark",
         height=height,
         scene_camera=dict(
             eye=dict(x=0.0, y=-0.1, z=-2),
             up=dict(x=0, y=-1.0, z=0),
             projection=dict(type="orthographic"),
         ),
+        font=dict(family='Arial', size=15),
         scene=dict(
             xaxis=axes,
             yaxis=axes,
@@ -38,6 +47,9 @@ def init_figure(height: int = 800) -> go.Figure:
         ),
         margin=dict(l=0, r=0, b=0, t=0, pad=0),
         legend=dict(orientation="h", yanchor="top", y=0.99, xanchor="left", x=0.1),
+
+        plot_bgcolor='white',  # Background color of the grid
+        paper_bgcolor='white',  # Background color of the entire figure
     )
     return fig
 
@@ -67,12 +79,14 @@ def plot_camera(
     R: np.ndarray,
     t: np.ndarray,
     K: np.ndarray,
-    color: str = "rgb(0, 0, 255)",
+    color: str = "rgb(255, 0, 0)",
+    color_fill: str = "rgb(255, 0, 0)",
     name: Optional[str] = None,
     legendgroup: Optional[str] = None,
     fill: bool = False,
     size: float = 1.0,
     text: Optional[str] = None,
+    opacity: float = 0.8
 ):
     """Plot a camera frustum from pose and intrinsic matrix."""
     W, H = K[0, 2] * 2, K[1, 2] * 2
@@ -97,7 +111,7 @@ def plot_camera(
             x=x,
             y=y,
             z=z,
-            color=color,
+            color=color_fill,
             i=i,
             j=j,
             k=k,
@@ -105,6 +119,7 @@ def plot_camera(
             name=name,
             showlegend=False,
             hovertemplate=text.replace("\n", "<br>"),
+            opacity=opacity
         )
         fig.add_trace(pyramid)
 
@@ -120,15 +135,15 @@ def plot_camera(
         mode="lines",
         legendgroup=legendgroup,
         name=name,
-        line=dict(color=color, width=1),
+        line=dict(color=color, width=2),
         showlegend=False,
         hovertemplate=text.replace("\n", "<br>"),
     )
     fig.add_trace(pyramid)
 
-
 def main():
-    root_dir = '/Users/yuanxy/Downloads/LocalSend/concave_recon'
+    root_dir = '/Users/yuanxy/Downloads/LocalSend/Fig3/20240902/concave_recon'
+    point_scale = 50
     # load dust3r results
     dust3r_name = os.path.join(root_dir, 'dust3r_result.npy')
     with open(dust3r_name, 'rb') as f:
@@ -141,11 +156,15 @@ def main():
     Ks = []
     Rs = []
     Ts = []
+    Rs_cam2world = []
+    Ts_cam2world = []
     for idx in range(len(imgs)):
         # inverse RT matrix, from cam2world to world2cam 
+        Rs_cam2world.append(poses[idx][:3, :3])
+        Ts_cam2world.append(poses[idx][:3, 3] * point_scale)
         rotation_mat = poses[idx][:3, :3]
         rotation_mat = rotation_mat.transpose()
-        trans_mat = - rotation_mat @ poses[idx][:3, 3]
+        trans_mat = - rotation_mat @ poses[idx][:3, 3] * point_scale
         f = focals[idx]
         W = imgs[idx].shape[1]
         H = imgs[idx].shape[0]
@@ -154,16 +173,31 @@ def main():
         Ts.append(trans_mat)
     # save to .mat for matlab visualizer
     mdic = {'R':Rs, 'T':Ts}
-    sio.savemat('/Users/yuanxy/Downloads/LocalSend/concave_recon/cameras.mat', mdic)
+    sio.savemat(os.path.join(root_dir, 'cameras.mat'), mdic)
+
+    # load clean point clouds
+    ply_data = PlyData.read(os.path.join(root_dir, 'points3D_clean.ply'))
+    # Access vertex data (including colors if available)
+    vertices = ply_data['vertex']
+    # Check if the PLY file contains RGB color information
+    if all(prop in vertices.data.dtype.names for prop in ['red', 'green', 'blue']):
+        # Extract vertex coordinates and colors
+        x_coords = vertices['x']
+        y_coords = vertices['y']
+        z_coords = vertices['z']
+        
+        red = vertices['red']
+        green = vertices['green']
+        blue = vertices['blue']
+    pts3d = np.stack([x_coords, y_coords, z_coords], axis=1)
+    color3d = np.stack([red, green, blue], axis=1)
 
     # plot reconstruction
     fig = init_figure()
-    # n_viz = min(80000,len(all_rgbs))
-    # idx_to_viz = list(np.round(np.linspace(0, len(all_rgbs)-1, n_viz)).astype(int))
-    # vis_rgbs = [all_rgbs[idx] for idx in idx_to_viz]
-    # plot_points(fig,all_pts3d[idx_to_viz],vis_rgbs,ps=2,name='3dpts')
-    for ind,(R,t,K) in enumerate(zip(R, T, Ks)):
-        plot_camera(fig,R,t,K,color="rgba(255,0,0,0.5)",text=f'cam_{ind}')
+    plot_points(fig, pts3d, color3d, ps=1, name='point cloud')
+    for ind,(R,t,K) in enumerate(zip(Rs_cam2world, Ts_cam2world, Ks)):
+        plot_camera(fig, R, t, K, color="rgba(255,0,0,1)", color_fill="rgba(255,0,0,0.45)",
+            fill=True, text=f'cam_{ind}', size=15)
     fig.show()
 
 if __name__ == '__main__':
