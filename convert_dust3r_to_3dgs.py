@@ -114,6 +114,7 @@ def convert_dust3r_cameras_to_colmap_cameras(scene, imgnames, outdir):
     current_w = int(imgs[0].shape[1])
     current_h = int(imgs[0].shape[0])
     scale_3dpts = 50
+    scale_low_conf_ = 3
 
     # convert cameras
     colmap_cameras = []
@@ -193,7 +194,7 @@ def convert_dust3r_cameras_to_colmap_cameras(scene, imgnames, outdir):
             all_rgbs_low.append(img[y,x,:] * 255.0)
         # scale pts3d_all_list
         pts3d_all_list[i] = pts3d_all_list[i] - camera_position
-        pts3d_all_list[i] = pts3d_all_list[i] * 5 + camera_position
+        pts3d_all_list[i] = pts3d_all_list[i] * scale_low_conf_ + camera_position
     all_pts3d_low = np.concatenate(pts3d_all_list, axis=0)
 
     # concate to generate the final pts3d and rgb
@@ -220,7 +221,7 @@ def convert_dust3r_cameras_to_colmap_cameras(scene, imgnames, outdir):
         depthimage = generate_depth_map(pt_map, colmap_rots[idx], colmap_trans[idx], 
             focals[idx], current_w / 2, current_h / 2)
         depthimage = depthimage * scale_3dpts
-        # depthimage[conf_i == False] = 1.0
+        depthimage[conf_i == False] = depthimage[conf_i == False] * scale_low_conf_
         depthfilename = os.path.join(outdir_colmap_depths, f'{basename}.npy')
         with open(depthfilename, 'wb') as f:
             np.save(f, depthimage)
