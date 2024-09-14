@@ -237,6 +237,7 @@ def main():
     # dataset dir
     rootdir = args.root
     datadir = os.path.join(rootdir, f'{args.dataname}')
+    print(f'\nData dir is {rootdir}/{datadir}\n')
     outdir = os.path.join(rootdir, f'{args.dataname}_recon')
     # dust3r dir name
     out_dust3r = os.path.join(outdir, 'dust3r_result.npy')
