@@ -142,7 +142,10 @@ def plot_camera(
     fig.add_trace(pyramid)
 
 def main():
-    root_dir = '/Users/yuanxy/Downloads/LocalSend/Fig3/20240902/concave_recon'
+    # root_dir = '/Users/yuanxy/Downloads/LocalSend/Fig3/20240902/concave_recon'
+    # root_dir = '/Users/yuanxy/Downloads/LocalSend/Fig3/20240902/convex_recon'
+    root_dir = '/Users/yuanxy/Downloads/LocalSend/Fig3/20240902/planar_recon'
+
     point_scale = 50
     # load dust3r results
     dust3r_name = os.path.join(root_dir, 'dust3r_result.npy')
