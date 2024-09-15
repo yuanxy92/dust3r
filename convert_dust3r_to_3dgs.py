@@ -114,7 +114,7 @@ def convert_dust3r_cameras_to_colmap_cameras(scene, imgnames, outdir):
     current_w = int(imgs[0].shape[1])
     current_h = int(imgs[0].shape[0])
     scale_3dpts = 50
-    scale_low_conf_ = 3
+    scale_low_conf_ = 5
 
     # convert cameras
     colmap_cameras = []
