@@ -114,7 +114,7 @@ def convert_dust3r_cameras_to_colmap_cameras(scene, imgnames, outdir):
     current_w = int(imgs[0].shape[1])
     current_h = int(imgs[0].shape[0])
     scale_3dpts = 50
-    scale_low_conf_ = 3
+    scale_low_conf_ = 5
 
     # convert cameras
     colmap_cameras = []
@@ -237,6 +237,7 @@ def main():
     # dataset dir
     rootdir = args.root
     datadir = os.path.join(rootdir, f'{args.dataname}')
+    print(f'\nData dir is {rootdir}/{datadir}\n')
     outdir = os.path.join(rootdir, f'{args.dataname}_recon')
     # dust3r dir name
     out_dust3r = os.path.join(outdir, 'dust3r_result.npy')
