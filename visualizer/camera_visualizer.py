@@ -12,7 +12,7 @@ def to_homogeneous(points):
     pad = np.ones((points.shape[:-1] + (1,)), dtype=points.dtype)
     return np.concatenate([points, pad], axis=-1)
 
-def init_figure(height: int = 800) -> go.Figure:
+def init_figure(height: int = 1200) -> go.Figure:
     """Initialize a 3D figure."""
     layout = Layout(plot_bgcolor='rgba(0,0,0,0)')
     fig = go.Figure(layout=layout)
@@ -28,7 +28,7 @@ def init_figure(height: int = 800) -> go.Figure:
         zerolinecolor='white',
         linecolor='black',
         linewidth=2,
-        tickfont=dict(family='Arial', size=15)
+        tickfont=dict(family='Arial', size=20)
     )
     fig.update_layout(
         height=height,
@@ -144,7 +144,8 @@ def plot_camera(
 def main():
     # root_dir = '/Users/yuanxy/Downloads/LocalSend/Fig3/20240902/concave_recon'
     # root_dir = '/Users/yuanxy/Downloads/LocalSend/Fig3/20240902/convex_recon'
-    root_dir = '/Users/yuanxy/Downloads/LocalSend/Fig3/20240902/planar_recon'
+    # root_dir = '/Users/yuanxy/Downloads/LocalSend/Fig3/20240902/planar_recon'
+    root_dir = '/Users/yuanxy/Downloads/LocalSend/Fig3/20240914_phone2/planar_recon'
 
     point_scale = 50
     # load dust3r results
@@ -197,10 +198,10 @@ def main():
 
     # plot reconstruction
     fig = init_figure()
-    plot_points(fig, pts3d, color3d, ps=1, name='point cloud')
+    plot_points(fig, pts3d, color3d, ps=1.5, name='point cloud')
     for ind,(R,t,K) in enumerate(zip(Rs_cam2world, Ts_cam2world, Ks)):
         plot_camera(fig, R, t, K, color="rgba(255,0,0,1)", color_fill="rgba(255,0,0,0.45)",
-            fill=True, text=f'cam_{ind}', size=15)
+            fill=True, text=f'cam_{ind}', size=20)
     fig.show()
 
 if __name__ == '__main__':
