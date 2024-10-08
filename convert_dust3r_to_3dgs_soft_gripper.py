@@ -246,6 +246,7 @@ def main():
 
     # get image names
     all_filenames, base_filenames = list_all_files(datadir)
+    all_filenames.sort()
 
     # apply dust3r
     images = load_images(all_filenames, size=512, square_ok=True)

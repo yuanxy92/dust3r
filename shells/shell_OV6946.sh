@@ -11,12 +11,40 @@
 #         --dataname $i
 # done
 
-for i in $(seq -w 000 017);
+# for i in $(seq -w 000 017);
+# do
+#    python convert_dust3r_to_3dgs_soft_gripper.py \
+#         --root /home/luvision/project/Code/data/Aurora/Fig_4/Softgripper_demo/capture_20241003_1 \
+#         --dataname ${i}
+#    python convert_dust3r_to_3dgs_soft_gripper.py \
+#         --root /home/luvision/project/Code/data/Aurora/Fig_4/Softgripper_demo/capture_20241003_1 \
+#         --dataname ${i}_sr
+# done
+
+# for i in $(seq -w 000 004);
+# do
+#    python convert_dust3r_to_3dgs_soft_gripper.py \
+#         --root /home/luvision/project/Code/data/Aurora/Fig_4/Softgripper_demo/capture_20241004_2 \
+#         --dataname ${i}
+#    python convert_dust3r_to_3dgs_soft_gripper.py \
+#         --root /home/luvision/project/Code/data/Aurora/Fig_4/Softgripper_demo/capture_20241004_2 \
+#         --dataname ${i}_sr
+# done
+
+# for i in $(seq -w 000 005);
+# do
+#    python convert_dust3r_to_3dgs_soft_gripper.py \
+#         --root /home/luvision/project/Code/data/Aurora/Fig_4/Softgripper_demo/capture_20241004_3 \
+#         --dataname ${i}
+#    python convert_dust3r_to_3dgs_soft_gripper.py \
+#         --root /home/luvision/project/Code/data/Aurora/Fig_4/Softgripper_demo/capture_20241004_3 \
+#         --dataname ${i}_sr
+# done
+
+# for i in $(seq -w 000 012);
+for i in $(seq -w 100 100);
 do
    python convert_dust3r_to_3dgs_soft_gripper.py \
-        --root /home/luvision/project/Code/data/Aurora/Fig_4/Softgripper_demo/capture_20241003_1 \
+        --root /home/luvision/project/Code/data/Aurora/Fig_4/Softgripper_demo/capture_20241004_4 \
         --dataname ${i}
-   python convert_dust3r_to_3dgs_soft_gripper.py \
-        --root /home/luvision/project/Code/data/Aurora/Fig_4/Softgripper_demo/capture_20241003_1 \
-        --dataname ${i}_sr
 done
