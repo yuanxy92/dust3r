@@ -67,20 +67,20 @@ if __name__ == '__main__':
     os.makedirs(outdir_pano, exist_ok=True)
 
     # iterative over all the images
-    cam_indices = ['0', '1', '2', '4', '5', '6']
+    # cam_indices = ['0', '1', '2', '4', '5', '6', '7', '8', '9', '10', '11']
     for frame_idx in range(args.start, args.stop, args.step):
         # check if all the images exists
         isexist = True
         name_list = []
         if has_mask:
             skymasks = []
-        for cam_idx in cam_indices:
-            filename = os.path.join(datadir, f'camera_{cam_idx}_frame_{frame_idx}_corrected.png')
-            isexist = isexist and os.path.isfile(filename)
-            name_list.append(filename)
-            if has_mask:
-                maskname = os.path.join(maskdir, f'camera_{cam_idx}_frame_{frame_idx}_mask.png')
-                skymasks.append(cv2.imread(maskname))
+        # for cam_idx in cam_indices:
+        #     filename = os.path.join(datadir, f'camera_{cam_idx}_frame_{frame_idx}_corrected.png')
+        #     isexist = isexist and os.path.isfile(filename)
+        #     name_list.append(filename)
+        #     if has_mask:
+        #         maskname = os.path.join(maskdir, f'camera_{cam_idx}_frame_{frame_idx}_mask.png')
+        #         skymasks.append(cv2.imread(maskname))
         if isexist == False:
             continue
 
@@ -95,7 +95,7 @@ if __name__ == '__main__':
         output = inference(pairs, model, device, batch_size=batch_size)
         # align dust3r point clouds
         scene = global_aligner(output, device=device, min_conf_thr=1.5, mode=GlobalAlignerMode.PointCloudOptimizer)
-        scene.preset_focal([246.8 / 400.0 * 512.0]*len(name_list))
+        # scene.preset_focal([246.8 / 400.0 * 512.0]*len(name_list))
         loss = scene.compute_global_alignment(init="mst", niter=niter, schedule=schedule, lr=lr)
         focals = scene.get_focals()
         avg_focal = sum(focals)/len(focals)

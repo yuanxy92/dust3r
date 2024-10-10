@@ -56,9 +56,16 @@
 #         --dataname ${i}
 # done
 
-for i in $(seq -w 013 013);
+# for i in $(seq -w 014 014);
+# do
+#    python convert_dust3r_to_3dgs_soft_gripper.py \
+#         --root /home/luvision/project/Code/data/Aurora/Fig_4/Softgripper_demo/capture_20241008_2 \
+#         --dataname ${i}
+# done
+
+for i in $(seq -w 101 101);
 do
    python convert_dust3r_to_3dgs_soft_gripper.py \
-        --root /home/luvision/project/Code/data/Aurora/Fig_4/Softgripper_demo/capture_20241008_2 \
+        --root /home/luvision/project/Code/data/Aurora/Fig_4/Softgripper_demo/capture_20241009_2 \
         --dataname ${i}
 done

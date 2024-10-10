@@ -23,14 +23,13 @@ if __name__ == "__main__":
     # source_dirs = [f'{rootdir}/005', f'{rootdir}/006']  # List of source directories
     # target_dir = f'{rootdir}/014'  # Target directory to store all merged images
 
-    rootdir = '/home/luvision/project/Code/data/Aurora/Fig_4/Softgripper_demo/capture_20241008_2'
+    rootdir = '/home/luvision/project/Code/data/Aurora/Fig_4/Softgripper_demo/capture_20241010_1'
     # Example usage
-    # source_dirs = [f'{rootdir}/000', f'{rootdir}/001', f'{rootdir}/002', 
-    #                f'{rootdir}/003', f'{rootdir}/004', f'{rootdir}/005']  # List of source directories
-    # source_dirs = [f'{rootdir}/000', f'{rootdir}/001', f'{rootdir}/002']  # List of source directories
-    # source_dirs = [f'{rootdir}/003', f'{rootdir}/004', f'{rootdir}/005']  # List of source directories
-    source_dirs = [f'{rootdir}/000', f'{rootdir}/002', f'{rootdir}/004']  # List of source directories
-    target_dir = f'{rootdir}/013'  # Target directory to store all merged images
+    source_dirs = []
+    for idx in range(0, 8):
+        source_dirs.append(f'{rootdir}/{idx:03d}')
+
+    target_dir = f'{rootdir}/100'  # Target directory to store all merged images
 
     merge_data_dirs(source_dirs, target_dir)
     print(f"All images have been copied to {target_dir}")
