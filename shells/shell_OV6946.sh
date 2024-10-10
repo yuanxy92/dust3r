@@ -63,9 +63,9 @@
 #         --dataname ${i}
 # done
 
-for i in $(seq -w 101 101);
+for i in $(seq -w 103 103);
 do
    python convert_dust3r_to_3dgs_soft_gripper.py \
-        --root /home/luvision/project/Code/data/Aurora/Fig_4/Softgripper_demo/capture_20241009_2 \
+        --root /home/luvision/project/Code/data/Aurora/Fig_4/Softgripper_demo/capture_20241010_2 \
         --dataname ${i}
 done
