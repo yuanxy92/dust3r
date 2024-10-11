@@ -249,15 +249,20 @@ def main():
     all_filenames.sort()
 
     # apply dust3r
-    images = load_images(all_filenames, size=512, square_ok=True)
+    images, masks = load_images(datadir, size=512, square_ok=True, folder_or_list_mask=f'{datadir}_mask')
     model_name = "checkpoints/DUSt3R_ViTLarge_BaseDecoder_512_dpt.pth"
 
     # dust3r inference
     model = AsymmetricCroCo3DStereo.from_pretrained(model_name).to(device)
     pairs = make_pairs(images, scene_graph='complete', prefilter=None, symmetrize=True)
-    output = inference(pairs, model, device, batch_size=batch_size)
+    if len(masks) > 0:
+        mask_pairs = make_pairs(masks, scene_graph='complete', prefilter=None, symmetrize=True)
+    
+    # output = inference(pairs, model, device, batch_size=batch_size)
+    output = inference(pairs, model, device, batch_size=batch_size, mask_pairs=mask_pairs)
+
     # align dust3r point clouds
-    scene = global_aligner(output, device=device, min_conf_thr=2.0, mode=GlobalAlignerMode.PointCloudOptimizer)
+    scene = global_aligner(output, device=device, min_conf_thr=1.05, mode=GlobalAlignerMode.PointCloudOptimizer)
     scene.preset_focal([246.8 / 400.0 * 512.0]*len(images))
     loss = scene.compute_global_alignment(init="mst", niter=niter, schedule=schedule, lr=lr)
     focals = scene.get_focals()
@@ -268,6 +273,9 @@ def main():
     # save to colmap results
     convert_dust3r_cameras_to_colmap_cameras(scene, all_filenames, outdir, scale_low_conf_= 1.0)
 
+    # import matplotlib.pyplot as plt 
+    # plt.imshow(np.moveaxis(np.squeeze(images[0]['img'].numpy()), [0], [2]))
+    # plt.imshow(np.squeeze(masks[0]['img'].numpy()))
 
 if __name__ == '__main__':
     main()

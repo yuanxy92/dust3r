@@ -12,9 +12,9 @@
             "console": "integratedTerminal",
             "args": [
                 "--root", 
-                "/home/luvision/project/Code/data/Aurora/Fig_3/20240909_2",
+                "/home/luvision/project/Code/data/Aurora/Fig_4/Softgripper_demo/capture_20241010_2",
                 "--dataname",
-                "concave"
+                "101"
             ]
         }
     ]

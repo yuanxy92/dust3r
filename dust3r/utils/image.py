@@ -21,6 +21,7 @@ except ImportError:
     heif_support_enabled = False
 
 ImgNorm = tvf.Compose([tvf.ToTensor(), tvf.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+ImgNormMask = tvf.Compose([tvf.ToTensor()])
 
 
 def img_to_arr( img ):
@@ -70,7 +71,103 @@ def _resize_pil_image(img, long_edge_size):
     return img.resize(new_size, interp)
 
 
-def load_images(folder_or_list, size, square_ok=False, verbose=True):
+def load_images(folder_or_list, size, square_ok=False, verbose=True, 
+                folder_or_list_mask=None):
+    """ open and convert all images in a list or folder to proper input format for DUSt3R
+    """
+    if isinstance(folder_or_list, str):
+        if verbose:
+            print(f'>> Loading images from {folder_or_list}')
+        root, folder_content = folder_or_list, sorted(os.listdir(folder_or_list))
+
+        if folder_or_list_mask is not None:
+            root_mask, folder_content_mask = folder_or_list_mask, sorted(os.listdir(folder_or_list_mask))
+
+    elif isinstance(folder_or_list, list):
+        if verbose:
+            print(f'>> Loading a list of {len(folder_or_list)} images')
+        root, folder_content = '', folder_or_list
+
+    else:
+        raise ValueError(f'bad {folder_or_list=} ({type(folder_or_list)})')
+
+    supported_images_extensions = ['.jpg', '.jpeg', '.png']
+    if heif_support_enabled:
+        supported_images_extensions += ['.heic', '.heif']
+    supported_images_extensions = tuple(supported_images_extensions)
+
+    imgs = []
+    masks = []
+    for path in folder_content:
+        # load image
+        if not path.lower().endswith(supported_images_extensions):
+            continue
+        img = exif_transpose(PIL.Image.open(os.path.join(root, path))).convert('RGB')
+        W1, H1 = img.size
+        if size == 224:
+            # resize short side to 224 (then crop)
+            img = _resize_pil_image(img, round(size * max(W1/H1, H1/W1)))
+        else:
+            # resize long side to 512
+            img = _resize_pil_image(img, size)
+        W, H = img.size
+        cx, cy = W//2, H//2
+        if size == 224:
+            half = min(cx, cy)
+            img = img.crop((cx-half, cy-half, cx+half, cy+half))
+        else:
+            halfw, halfh = ((2*cx)//16)*8, ((2*cy)//16)*8
+            if not (square_ok) and W == H:
+                halfh = 3*halfw/4
+            img = img.crop((cx-halfw, cy-halfh, cx+halfw, cy+halfh))
+
+        W2, H2 = img.size
+        if verbose:
+            print(f' - adding {path} with resolution {W1}x{H1} --> {W2}x{H2}')
+        imgs.append(dict(img=ImgNorm(img)[None], true_shape=np.int32(
+            [img.size[::-1]]), idx=len(imgs), instance=str(len(imgs))))
+        
+        # load mask
+        if folder_or_list_mask is not None:
+            img_mask = exif_transpose(PIL.Image.open(os.path.join(root_mask, path))).convert('RGBA')
+            _, _, _, img_mask = img_mask.split()
+            W1, H1 = img_mask.size
+            if size == 224:
+                # resize short side to 224 (then crop)
+                img_mask = _resize_pil_image(img_mask, round(size * max(W1/H1, H1/W1)))
+            else:
+                # resize long side to 512
+                img_mask = _resize_pil_image(img_mask, size)
+            W, H = img_mask.size
+            cx, cy = W//2, H//2
+            if size == 224:
+                half = min(cx, cy)
+                img_mask = img_mask.crop((cx-half, cy-half, cx+half, cy+half))
+            else:
+                halfw, halfh = ((2*cx)//16)*8, ((2*cy)//16)*8
+                if not (square_ok) and W == H:
+                    halfh = 3*halfw/4
+                img_mask = img_mask.crop((cx-halfw, cy-halfh, cx+halfw, cy+halfh))
+
+            W2, H2 = img_mask.size
+            if verbose:
+                print(f' - adding {path} with resolution {W1}x{H1} --> {W2}x{H2}')
+            masks.append(dict(img=ImgNormMask(img_mask)[None], true_shape=np.int32(
+                [img_mask.size[::-1]]), idx=len(masks), instance=str(len(masks))))
+        
+
+    assert imgs, 'no images foud at '+root
+    if verbose:
+        print(f' (Found {len(imgs)} images)')
+
+    if len(masks) > 0:
+        for mask_idx in range(len(masks)):
+            mask_shape = masks[mask_idx]['img'].shape
+            masks[mask_idx]['img'] = torch.reshape(masks[mask_idx]['img'], (mask_shape[1], mask_shape[2], mask_shape[3]))
+
+    return imgs, masks
+
+def load_masks(folder_or_list, size, square_ok=False, verbose=True):
     """ open and convert all images in a list or folder to proper input format for DUSt3R
     """
     if isinstance(folder_or_list, str):
@@ -86,7 +183,7 @@ def load_images(folder_or_list, size, square_ok=False, verbose=True):
     else:
         raise ValueError(f'bad {folder_or_list=} ({type(folder_or_list)})')
 
-    supported_images_extensions = ['.jpg', '.jpeg', '.png']
+    supported_images_extensions = ['.png']
     if heif_support_enabled:
         supported_images_extensions += ['.heic', '.heif']
     supported_images_extensions = tuple(supported_images_extensions)

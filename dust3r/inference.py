@@ -53,7 +53,7 @@ def loss_of_one_batch(batch, model, criterion, device, symmetrize_batch=False, u
 
 
 @torch.no_grad()
-def inference(pairs, model, device, batch_size=8, verbose=True):
+def inference(pairs, model, device, batch_size=8, verbose=True, mask_pairs=None):
     if verbose:
         print(f'>> Inference with model on {len(pairs)} image pairs')
     result = []
@@ -66,6 +66,13 @@ def inference(pairs, model, device, batch_size=8, verbose=True):
     for i in tqdm.trange(0, len(pairs), batch_size, disable=not verbose):
         res = loss_of_one_batch(collate_with_cat(pairs[i:i + batch_size]), model, None, device)
         result.append(to_cpu(res))
+
+    if mask_pairs is not None:
+        for idx in range(len(pairs)):
+            result[idx]['pred1']['conf'] = (result[idx]['pred1']['conf'] - 1.0) * mask_pairs[0][0]['img'] + 1.0
+            result[idx]['pred2']['conf'] = (result[idx]['pred2']['conf'] - 1.0) * mask_pairs[0][1]['img'] + 1.0
+            # result[idx]['pred1']['conf'] = result[idx]['pred1']['conf'] * mask_pairs[0][0]['img']
+            # result[idx]['pred2']['conf'] = result[idx]['pred2']['conf'] * mask_pairs[0][1]['img']
 
     result = collate_with_cat(result, lists=multiple_shapes)
 
