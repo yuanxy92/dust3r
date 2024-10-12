@@ -83,7 +83,7 @@ def list_all_files(folder_path):
     except Exception as e:
         return f"An error occurred: {str(e)}"
     
-def convert_dust3r_cameras_to_colmap_cameras(scene, imgnames, outdir, scale_low_conf_ = 5.0):
+def convert_dust3r_cameras_to_colmap_cameras(scene, imgnames, outdir, scale_low_conf_ = 5.0, mask_dir = None):
     # get images, focal length
     imgs = scene.imgs
     focals = scene.get_focals()
@@ -159,7 +159,15 @@ def convert_dust3r_cameras_to_colmap_cameras(scene, imgnames, outdir, scale_low_
         camera_positions.append(camera_position)
         colmap_images.append(image)
         # copy images
-        shutil.copyfile(imgnames[idx], os.path.join(outdir_colmap_images, basename))
+        if mask_dir is None:
+            shutil.copyfile(imgnames[idx], os.path.join(outdir_colmap_images, basename))
+        else:
+            # generate RGBA image
+            img_bgr = cv2.imread(imgnames[idx])
+            img_mask = cv2.imread(os.path.join(mask_dir, basename), flags=cv2.IMREAD_UNCHANGED)
+            img_mask = img_mask[:, :, 3:4]
+            img_bgra = np.concatenate([img_bgr, img_mask], axis=2)
+            cv2.imwrite(os.path.join(outdir_colmap_images, basename), img_bgra)
 
     # write images
     image_pathname = os.path.join(outdir_colmap_sparse, 'images.txt')
@@ -169,36 +177,61 @@ def convert_dust3r_cameras_to_colmap_cameras(scene, imgnames, outdir, scale_low_
     # generate 3d points
     pts3d = scene.get_pts3d()
     pts3d = [pts.detach().cpu().numpy() for pts in pts3d]
-    # add points with high confidence
-    pts2d_all_list, pts3d_all_list, all_rgbs_high = [], [], []
+
+    # add points in mask
+    pts2d_all_list = []
+    pts3d_all_list = []
+    all_pts3d = []
+    all_rgbs = []
     for i in range(len(imgs)):
-        conf_i = confidence_masks[i]
+        basename = os.path.basename(imgnames[i])
+        if mask_dir is not None:
+            mask = cv2.imread(os.path.join(mask_dir, basename), flags=cv2.IMREAD_UNCHANGED)
+            if mask.shape[2] == 4:
+                conf_i = mask[:, :, 3].astype(np.bool_)
+            else:
+                conf_i = np.ones((mask.shape[0], mask.shape[1])).astype(np.bool_)
+        else:
+            conf_i = np.ones((imgs[i].shape[0], imgs[i].shape[1])).astype(np.bool_)
         pts2d_all_list.append(xy_grid(*imgs[i].shape[:2][::-1])[conf_i])  # imgs[i].shape[:2] = (H, W)
         pts3d_all_list.append(pts3d[i][conf_i])
         img = imgs[i]
         for pos in pts2d_all_list[i]:
             x,y = pos
-            all_rgbs_high.append(img[y,x,:] * 255.0)
-    all_pts3d_high = np.concatenate(pts3d_all_list, axis=0)
+            all_rgbs.append(img[y,x,:] * 255.0)
+    all_pts3d = np.concatenate(pts3d_all_list, axis=0)
 
-    # add points with low confidence
-    pts2d_all_list, pts3d_all_list, all_rgbs_low = [], [], []
-    for i in range(len(imgs)):
-        conf_i = np.logical_not(confidence_masks[i])
-        pts2d_all_list.append(xy_grid(*imgs[i].shape[:2][::-1])[conf_i])  # imgs[i].shape[:2] = (H, W)
-        pts3d_all_list.append(pts3d[i][conf_i])
-        img = imgs[i]
-        for pos in pts2d_all_list[i]:
-            x,y = pos
-            all_rgbs_low.append(img[y,x,:] * 255.0)
-        # scale pts3d_all_list
-        pts3d_all_list[i] = pts3d_all_list[i] - camera_position
-        pts3d_all_list[i] = pts3d_all_list[i] * scale_low_conf_ + camera_position
-    all_pts3d_low = np.concatenate(pts3d_all_list, axis=0)
+    # # add points with high confidence
+    # pts2d_all_list, pts3d_all_list, all_rgbs_high = [], [], []
+    # for i in range(len(imgs)):
+    #     conf_i = confidence_masks[i]
+    #     pts2d_all_list.append(xy_grid(*imgs[i].shape[:2][::-1])[conf_i])  # imgs[i].shape[:2] = (H, W)
+    #     pts3d_all_list.append(pts3d[i][conf_i])
+    #     img = imgs[i]
+    #     for pos in pts2d_all_list[i]:
+    #         x,y = pos
+    #         all_rgbs_high.append(img[y,x,:] * 255.0)
+    # all_pts3d_high = np.concatenate(pts3d_all_list, axis=0)
 
-    # concate to generate the final pts3d and rgb
-    all_pts3d = np.concatenate([all_pts3d_high, all_pts3d_low], axis=0)
-    all_rgbs = np.concatenate([all_rgbs_high, all_rgbs_low], axis=0)
+    # # add points with low confidence
+    # pts2d_all_list, pts3d_all_list, all_rgbs_low = [], [], []
+    # for i in range(len(imgs)):
+    #     conf_i = np.logical_not(confidence_masks[i])
+    #     pts2d_all_list.append(xy_grid(*imgs[i].shape[:2][::-1])[conf_i])  # imgs[i].shape[:2] = (H, W)
+    #     pts3d_all_list.append(pts3d[i][conf_i])
+    #     img = imgs[i]
+    #     for pos in pts2d_all_list[i]:
+    #         x,y = pos
+    #         all_rgbs_low.append(img[y,x,:] * 255.0)
+    #     # scale pts3d_all_list
+    #     pts3d_all_list[i] = pts3d_all_list[i] - camera_position
+    #     pts3d_all_list[i] = pts3d_all_list[i] * scale_low_conf_ + camera_position
+    # all_pts3d_low = np.concatenate(pts3d_all_list, axis=0)
+    # # concate to generate the final pts3d and rgb
+    # all_pts3d = np.concatenate([all_pts3d_high, all_pts3d_low], axis=0)
+    # all_rgbs = np.concatenate([all_rgbs_high, all_rgbs_low], axis=0)
+
+
     n_viz = min(160000, len(all_rgbs))
     idx_to_viz = list(np.round(np.linspace(0, len(all_rgbs)-1, n_viz)).astype(int))
     vis_rgbs = [all_rgbs[idx] for idx in idx_to_viz]
@@ -249,7 +282,11 @@ def main():
     all_filenames.sort()
 
     # apply dust3r
-    images, masks = load_images(datadir, size=512, square_ok=True, folder_or_list_mask=f'{datadir}_mask')
+    folder_or_list_mask = f'{datadir}_mask'
+
+    if not os.path.isdir(folder_or_list_mask):
+        folder_or_list_mask = None
+    images, masks = load_images(all_filenames, size=512, square_ok=True, folder_or_list_mask=folder_or_list_mask)
     model_name = "checkpoints/DUSt3R_ViTLarge_BaseDecoder_512_dpt.pth"
 
     # dust3r inference
@@ -258,20 +295,32 @@ def main():
     if len(masks) > 0:
         mask_pairs = make_pairs(masks, scene_graph='complete', prefilter=None, symmetrize=True)
     
-    # output = inference(pairs, model, device, batch_size=batch_size)
-    output = inference(pairs, model, device, batch_size=batch_size, mask_pairs=mask_pairs)
+    if len(masks) == 0:
+        output = inference(pairs, model, device, batch_size=batch_size)
+    else:
+        output = inference(pairs, model, device, batch_size=batch_size, mask_pairs=mask_pairs)
 
     # align dust3r point clouds
     scene = global_aligner(output, device=device, min_conf_thr=1.05, mode=GlobalAlignerMode.PointCloudOptimizer)
-    scene.preset_focal([246.8 / 400.0 * 512.0]*len(images))
+    # scene.preset_focal([246.8 / 400.0 * 512.0]*len(images))
+    scene.preset_focal([370.0] * len(images))
     loss = scene.compute_global_alignment(init="mst", niter=niter, schedule=schedule, lr=lr)
     focals = scene.get_focals()
     avg_focal = sum(focals)/len(focals)
+    for fidx, focal in enumerate(focals):
+        print(f'Focal length of image {fidx} = {focal}')
+    print(f'Average focal length = {avg_focal}')
+
     # save results
     viz_3d.save_dust3r_poses_and_depth(scene, out_dust3r)
 
     # save to colmap results
-    convert_dust3r_cameras_to_colmap_cameras(scene, all_filenames, outdir, scale_low_conf_= 1.0)
+    
+    if len(masks) > 0:
+        # convert_dust3r_cameras_to_colmap_cameras(scene, all_filenames, outdir, scale_low_conf_= 1.0)
+        convert_dust3r_cameras_to_colmap_cameras(scene, all_filenames, outdir, scale_low_conf_= 1.0, mask_dir = folder_or_list_mask)
+    else:
+        convert_dust3r_cameras_to_colmap_cameras(scene, all_filenames, outdir, scale_low_conf_= 1.0)
 
     # import matplotlib.pyplot as plt 
     # plt.imshow(np.moveaxis(np.squeeze(images[0]['img'].numpy()), [0], [2]))

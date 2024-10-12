@@ -75,22 +75,25 @@ def load_images(folder_or_list, size, square_ok=False, verbose=True,
                 folder_or_list_mask=None):
     """ open and convert all images in a list or folder to proper input format for DUSt3R
     """
-    if isinstance(folder_or_list, str):
-        if verbose:
-            print(f'>> Loading images from {folder_or_list}')
-        root, folder_content = folder_or_list, sorted(os.listdir(folder_or_list))
+    # if isinstance(folder_or_list, str):
+    #     if verbose:
+    #         print(f'>> Loading images from {folder_or_list}')
+    #     root, folder_content = folder_or_list, sorted(os.listdir(folder_or_list))
 
-        if folder_or_list_mask is not None:
-            root_mask, folder_content_mask = folder_or_list_mask, sorted(os.listdir(folder_or_list_mask))
+    #     if folder_or_list_mask is not None:
+    #         root_mask, folder_content_mask = folder_or_list_mask, sorted(os.listdir(folder_or_list_mask))
 
-    elif isinstance(folder_or_list, list):
-        if verbose:
-            print(f'>> Loading a list of {len(folder_or_list)} images')
-        root, folder_content = '', folder_or_list
+    # elif isinstance(folder_or_list, list):
+    #     if verbose:
+    #         print(f'>> Loading a list of {len(folder_or_list)} images')
+    #     root, folder_content = '', folder_or_list
 
-    else:
-        raise ValueError(f'bad {folder_or_list=} ({type(folder_or_list)})')
+    # else:
+    #     raise ValueError(f'bad {folder_or_list=} ({type(folder_or_list)})')
 
+    root = ''
+    root_mask = folder_or_list_mask
+    folder_content = folder_or_list
     supported_images_extensions = ['.jpg', '.jpeg', '.png']
     if heif_support_enabled:
         supported_images_extensions += ['.heic', '.heif']
@@ -129,7 +132,8 @@ def load_images(folder_or_list, size, square_ok=False, verbose=True,
         
         # load mask
         if folder_or_list_mask is not None:
-            img_mask = exif_transpose(PIL.Image.open(os.path.join(root_mask, path))).convert('RGBA')
+            basename = os.path.basename(path)
+            img_mask = exif_transpose(PIL.Image.open(os.path.join(root_mask, basename))).convert('RGBA')
             _, _, _, img_mask = img_mask.split()
             W1, H1 = img_mask.size
             if size == 224:
@@ -150,8 +154,6 @@ def load_images(folder_or_list, size, square_ok=False, verbose=True,
                 img_mask = img_mask.crop((cx-halfw, cy-halfh, cx+halfw, cy+halfh))
 
             W2, H2 = img_mask.size
-            if verbose:
-                print(f' - adding {path} with resolution {W1}x{H1} --> {W2}x{H2}')
             masks.append(dict(img=ImgNormMask(img_mask)[None], true_shape=np.int32(
                 [img_mask.size[::-1]]), idx=len(masks), instance=str(len(masks))))
         
