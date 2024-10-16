@@ -301,9 +301,9 @@ def main():
         output = inference(pairs, model, device, batch_size=batch_size, mask_pairs=mask_pairs)
 
     # align dust3r point clouds
-    scene = global_aligner(output, device=device, min_conf_thr=1.05, mode=GlobalAlignerMode.PointCloudOptimizer)
+    scene = global_aligner(output, device=device, min_conf_thr=2.5, mode=GlobalAlignerMode.PointCloudOptimizer)
     # scene.preset_focal([246.8 / 400.0 * 512.0]*len(images))
-    scene.preset_focal([370.0] * len(images))
+    scene.preset_focal([442.0] * len(images))
     loss = scene.compute_global_alignment(init="mst", niter=niter, schedule=schedule, lr=lr)
     focals = scene.get_focals()
     avg_focal = sum(focals)/len(focals)
