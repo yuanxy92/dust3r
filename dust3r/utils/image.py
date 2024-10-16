@@ -169,7 +169,7 @@ def load_images(folder_or_list, size, square_ok=False, verbose=True,
 
     return imgs, masks
 
-def load_masks(folder_or_list, size, square_ok=False, verbose=True):
+def load_images_old(folder_or_list, size, square_ok=False, verbose=True):
     """ open and convert all images in a list or folder to proper input format for DUSt3R
     """
     if isinstance(folder_or_list, str):
@@ -185,7 +185,7 @@ def load_masks(folder_or_list, size, square_ok=False, verbose=True):
     else:
         raise ValueError(f'bad {folder_or_list=} ({type(folder_or_list)})')
 
-    supported_images_extensions = ['.png']
+    supported_images_extensions = ['.png', '.jpg']
     if heif_support_enabled:
         supported_images_extensions += ['.heic', '.heif']
     supported_images_extensions = tuple(supported_images_extensions)

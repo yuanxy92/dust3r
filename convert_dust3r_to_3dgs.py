@@ -1,6 +1,6 @@
 from dust3r.inference import inference
 from dust3r.model import AsymmetricCroCo3DStereo
-from dust3r.utils.image import load_images
+from dust3r.utils.image import load_images, load_images_old
 from dust3r.image_pairs import make_pairs
 from dust3r.cloud_opt import global_aligner, GlobalAlignerMode
 from dust3r.viz import show_raw_pointcloud,cat_3d
@@ -249,7 +249,7 @@ def main():
     all_filenames, base_filenames = list_all_files(datadir)
 
     # apply dust3r
-    images = load_images(all_filenames, size=512, square_ok=True)
+    images = load_images_old(all_filenames, size=512, square_ok=True)
     model_name = "checkpoints/DUSt3R_ViTLarge_BaseDecoder_512_dpt.pth"
 
     # dust3r inference
@@ -261,6 +261,9 @@ def main():
     loss = scene.compute_global_alignment(init="mst", niter=niter, schedule=schedule, lr=lr)
     focals = scene.get_focals()
     avg_focal = sum(focals)/len(focals)
+    for fidx, focal in enumerate(focals):
+        print(f'Focal length of image {fidx} = {focal}')
+    print(f'Average focal length = {avg_focal}')
     # save results
     viz_3d.save_dust3r_poses_and_depth(scene, out_dust3r)
 
