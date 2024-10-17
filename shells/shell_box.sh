@@ -77,6 +77,13 @@
 #         --dataname ${i}
 # done
 
-python convert_dust3r_to_3dgs.py \
-        --root /home/luvision/project/Code/data/Aurora/Fig_4/AR_demo \
-        --dataname box2
+# python convert_dust3r_to_3dgs.py \
+#         --root /home/luvision/project/Code/data/Aurora/Fig_4/AR_demo \
+#         --dataname box4
+
+for i in $(seq -w 003 003);
+do
+   python convert_dust3r_to_3dgs_soft_gripper.py \
+        --root /home/luvision/project/Code/data/Aurora/Fig_4/Softgripper_demo/capture_20241014_hand_1 \
+        --dataname ${i}
+done

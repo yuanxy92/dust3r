@@ -22,6 +22,7 @@ import shutil
 import argparse
 from plyfile import PlyData, PlyElement
 from colmapio import colmap_io_tool as ct
+from colmapio.colmap_tranform import apply_4x4_transform, apply_camera_transform_4x4
 
 device = 'cuda'
 batch_size = 1
@@ -83,7 +84,8 @@ def list_all_files(folder_path):
     except Exception as e:
         return f"An error occurred: {str(e)}"
     
-def convert_dust3r_cameras_to_colmap_cameras(scene, imgnames, outdir, scale_low_conf_ = 5.0, mask_dir = None):
+def convert_dust3r_cameras_to_colmap_cameras(scene, imgnames, outdir, \
+    scale_low_conf_ = 5.0, mask_dir = None, transform4x4 = np.eye(4)):
     # get images, focal length
     imgs = scene.imgs
     focals = scene.get_focals()
@@ -143,6 +145,14 @@ def convert_dust3r_cameras_to_colmap_cameras(scene, imgnames, outdir, scale_low_
         rotation_mat = poses[idx][:3, :3]
         rotation_mat = rotation_mat.transpose()
         tvec = - rotation_mat @ poses[idx][:3, 3]
+
+        extrinsic_orig = np.eye(4)
+        extrinsic_orig[:3, :3] = rotation_mat
+        extrinsic_orig[:3, 3] = tvec
+        extrinsic_new = apply_camera_transform_4x4(extrinsic_orig, transform4x4)
+        rotation_mat = extrinsic_new[:3, :3]
+        tvec = extrinsic_new[:3, 3]
+
         qvec = ct.rotmat2qvec(rotation_mat)
         image = ct.BaseImage(
             idx + 1,
@@ -200,6 +210,8 @@ def convert_dust3r_cameras_to_colmap_cameras(scene, imgnames, outdir, scale_low_
             x,y = pos
             all_rgbs.append(img[y,x,:] * 255.0)
     all_pts3d = np.concatenate(pts3d_all_list, axis=0)
+
+    all_pts3d = apply_4x4_transform(all_pts3d, transform4x4)
 
     # # add points with high confidence
     # pts2d_all_list, pts3d_all_list, all_rgbs_high = [], [], []
