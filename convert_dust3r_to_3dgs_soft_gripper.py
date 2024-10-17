@@ -85,7 +85,7 @@ def list_all_files(folder_path):
         return f"An error occurred: {str(e)}"
     
 def convert_dust3r_cameras_to_colmap_cameras(scene, imgnames, outdir, \
-    scale_low_conf_ = 5.0, mask_dir = None, transform4x4 = np.eye(4)):
+    scale_low_conf_ = 5.0, mask_dir = None, transform4x4 = np.eye(4), transformscale = 1.0):
     # get images, focal length
     imgs = scene.imgs
     focals = scene.get_focals()
@@ -143,21 +143,22 @@ def convert_dust3r_cameras_to_colmap_cameras(scene, imgnames, outdir, \
         basename = os.path.basename(imgnames[idx])
         # inverse RT matrix, from cam2world to world2cam 
         rotation_mat = poses[idx][:3, :3]
+        tvec = poses[idx][:3, 3]
         rotation_mat = rotation_mat.transpose()
-        tvec = - rotation_mat @ poses[idx][:3, 3]
+        tvec = -rotation_mat @ tvec * transformscale * scale_3dpts
 
         extrinsic_orig = np.eye(4)
         extrinsic_orig[:3, :3] = rotation_mat
         extrinsic_orig[:3, 3] = tvec
         extrinsic_new = apply_camera_transform_4x4(extrinsic_orig, transform4x4)
-        rotation_mat = extrinsic_new[:3, :3]
-        tvec = extrinsic_new[:3, 3]
-
+        rotation_mat = extrinsic_new[:3, :3] 
+        tvec = extrinsic_new[:3, 3] 
+        
         qvec = ct.rotmat2qvec(rotation_mat)
         image = ct.BaseImage(
             idx + 1,
             qvec,
-            tvec * scale_3dpts,
+            tvec ,
             idx + 1,
             basename,
             [],
@@ -187,6 +188,12 @@ def convert_dust3r_cameras_to_colmap_cameras(scene, imgnames, outdir, \
     # generate 3d points
     pts3d = scene.get_pts3d()
     pts3d = [pts.detach().cpu().numpy() for pts in pts3d]
+    for pts3d_idx in range(len(pts3d)):
+        pt3d_ = pts3d[pts3d_idx]
+        s0, s1, s2 = pt3d_.shape
+        pt3d_ = pt3d_.reshape((s0 * s1, s2)) * transformscale * scale_3dpts
+        pt3d_ = apply_4x4_transform(pt3d_, transform4x4) 
+        pts3d[pts3d_idx] = pt3d_.reshape((s0, s1, s2))
 
     # add points in mask
     pts2d_all_list = []
@@ -210,8 +217,6 @@ def convert_dust3r_cameras_to_colmap_cameras(scene, imgnames, outdir, \
             x,y = pos
             all_rgbs.append(img[y,x,:] * 255.0)
     all_pts3d = np.concatenate(pts3d_all_list, axis=0)
-
-    all_pts3d = apply_4x4_transform(all_pts3d, transform4x4)
 
     # # add points with high confidence
     # pts2d_all_list, pts3d_all_list, all_rgbs_high = [], [], []
@@ -247,7 +252,7 @@ def convert_dust3r_cameras_to_colmap_cameras(scene, imgnames, outdir, \
     n_viz = min(160000, len(all_rgbs))
     idx_to_viz = list(np.round(np.linspace(0, len(all_rgbs)-1, n_viz)).astype(int))
     vis_rgbs = [all_rgbs[idx] for idx in idx_to_viz]
-    vis_xyzs = all_pts3d[idx_to_viz].astype(np.float32) * scale_3dpts
+    vis_xyzs = all_pts3d[idx_to_viz].astype(np.float32)
 
     pt3d_pathname = os.path.join(outdir_colmap_sparse, 'points3D_o3d.ply')
     storePly(pt3d_pathname, vis_xyzs, vis_rgbs)
@@ -264,7 +269,7 @@ def convert_dust3r_cameras_to_colmap_cameras(scene, imgnames, outdir, \
         # convert point clouds to depth maps
         depthimage = generate_depth_map(pt_map, colmap_rots[idx], colmap_trans[idx], 
             focals[idx], current_w / 2, current_h / 2)
-        depthimage = depthimage * scale_3dpts
+        depthimage = depthimage
         depthimage[conf_i == False] = depthimage[conf_i == False] * scale_low_conf_
         depthfilename = os.path.join(outdir_colmap_depths, f'{basename}.npy')
         with open(depthfilename, 'wb') as f:
@@ -315,7 +320,7 @@ def main():
     # align dust3r point clouds
     scene = global_aligner(output, device=device, min_conf_thr=2.5, mode=GlobalAlignerMode.PointCloudOptimizer)
     # scene.preset_focal([246.8 / 400.0 * 512.0]*len(images))
-    # scene.preset_focal([442.0] * len(images))
+    scene.preset_focal([377.8] * len(images))
     loss = scene.compute_global_alignment(init="mst", niter=niter, schedule=schedule, lr=lr)
     focals = scene.get_focals()
     avg_focal = sum(focals)/len(focals)
@@ -327,12 +332,26 @@ def main():
     viz_3d.save_dust3r_poses_and_depth(scene, out_dust3r)
 
     # save to colmap results
-    
+    transform4x4 = [[0.262,	-0.182,	0.012,	0.724],
+                    [0.094,	0.153,	0.264,	-0.430],
+                    [-0.156,	-0.213,	0.180,	6.008],
+                    [0.000,	0.000,	0.000,	1.000]]
+
+    # transform4x4 = [[0.263,	-0.169,	0.011,	0.596],
+    #                 [0.084,	0.148,	0.263,	-0.451],
+    #                 [-0.147,	-0.218,	0.170,	6.119],
+    #                 [0.000,	0.000,	0.000,	1.000]]
+    transform4x4 = np.array(transform4x4)
+    # transform4x4 = np.eye(4)
+
+    transformscale = np.linalg.norm(transform4x4[:3, :3], axis=0)[0]
+    transform4x4[:3, :3] = transform4x4[:3, :3] / transformscale
+
     if len(masks) > 0:
         # convert_dust3r_cameras_to_colmap_cameras(scene, all_filenames, outdir, scale_low_conf_= 1.0)
-        convert_dust3r_cameras_to_colmap_cameras(scene, all_filenames, outdir, scale_low_conf_= 1.0, mask_dir = folder_or_list_mask)
+        convert_dust3r_cameras_to_colmap_cameras(scene, all_filenames, outdir, scale_low_conf_= 1.0, mask_dir = folder_or_list_mask, transform4x4=transform4x4, transformscale=transformscale)
     else:
-        convert_dust3r_cameras_to_colmap_cameras(scene, all_filenames, outdir, scale_low_conf_= 1.0)
+        convert_dust3r_cameras_to_colmap_cameras(scene, all_filenames, outdir, scale_low_conf_= 1.0, transform4x4=transform4x4, transformscale=transformscale)
 
     # import matplotlib.pyplot as plt 
     # plt.imshow(np.moveaxis(np.squeeze(images[0]['img'].numpy()), [0], [2]))

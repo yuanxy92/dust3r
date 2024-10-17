@@ -24,18 +24,13 @@ def apply_4x4_transform(points, transform_matrix):
     return transformed_points
 
 def apply_camera_transform_4x4(extrinsic_matrix, transform_matrix):
-    """
-    Apply a 4x4 transformation matrix to a camera's extrinsic matrix.
-    
-    Parameters:
-    - extrinsic_matrix (np.ndarray): Camera extrinsic matrix (4, 4)
-    - transform_matrix (np.ndarray): 4x4 transformation matrix
-    
-    Returns:
-    - transformed_extrinsic (np.ndarray): Transformed camera extrinsic matrix (4, 4)
-    """
+    transform_matrix_inv = np.eye(4)
+    inv_rotation = transform_matrix[:3, :3].T
+    transform_matrix_inv[:3, :3] = inv_rotation
+    transform_matrix_inv[:3, 3] = -inv_rotation @ transform_matrix[:3, 3]
+
     # Apply the transformation matrix to the camera's extrinsic matrix
-    transformed_extrinsic = np.dot(transform_matrix, extrinsic_matrix)
+    transformed_extrinsic = np.dot(extrinsic_matrix, transform_matrix_inv)
     
     return transformed_extrinsic
 
