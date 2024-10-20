@@ -1,6 +1,6 @@
 #!/bin/bash
 python convert_dust3r_to_3dgs.py \
-        --root /home/luvision/project/Code/data/Aurora/Fig_3/20240914_phone2 \
+        --root /home/luvision/project/Code/data/Aurora/Fig_3/20240914_phone2/smooth \
         --dataname concave
 
 # python convert_dust3r_to_3dgs.py \
